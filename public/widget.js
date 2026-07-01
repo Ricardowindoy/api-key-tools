@@ -1,9 +1,10 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-let configData = { stepfun: { keys: [], selectedModel: "" }, opencode: { keys: [], selectedModel: "" } };
-let modelsData = { stepfun: [], opencode: [] };
-let currentProvider = "stepfun";
+let configData = {};
+let modelsData = {};
+let currentProvider = "";
+let providerList = [];
 
 function getTheme() {
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
@@ -38,6 +39,10 @@ async function loadModels() {
   const selectedKey = getSelectedKey();
   const apiKey = selectedKey?.key || "";
   const baseUrl = providerData.baseUrl || "";
+  if (!apiKey || !baseUrl) {
+    modelsData[currentProvider] = [];
+    return;
+  }
   try {
     const r = await fetch(`/api/models/${currentProvider}`, {
       method: "POST",
@@ -53,7 +58,6 @@ async function loadModels() {
   }
 }
 
-// 定向更新选中项，避免全量覆写导致主窗口数据丢失
 async function saveSelect(provider, { keyId, modelId } = {}) {
   const payload = { provider };
   if (keyId !== undefined) payload.keyId = keyId;
@@ -77,6 +81,32 @@ async function saveSelect(provider, { keyId, modelId } = {}) {
 function getSelectedKey() {
   const keys = configData[currentProvider]?.keys || [];
   return keys.find((k) => k.selected) || keys[0] || null;
+}
+
+function populateProviderSelect() {
+  const select = $("#providerSelect");
+  select.innerHTML = "";
+  providerList = Object.keys(configData).sort();
+  if (providerList.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "无厂商";
+    select.appendChild(opt);
+    return;
+  }
+  providerList.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    select.appendChild(opt);
+  });
+  // 保持当前 provider 有效
+  if (currentProvider && providerList.includes(currentProvider)) {
+    select.value = currentProvider;
+  } else {
+    currentProvider = providerList[0] || "";
+    select.value = currentProvider;
+  }
 }
 
 function render() {
@@ -153,23 +183,24 @@ function showToast(msg) {
 let isExpanded = false;
 let autoHideTimer = null;
 let configPollTimer = null;
-let configPollSeq = 0;   // 递增序号，确保每次 fetch 拿到最新响应
+let configPollSeq = 0;
 
 function startConfigPolling() {
-  if (configPollTimer) return;   // 已在轮询
-  if (!isExpanded) return;       // 竞态保护：收起时不应启动
+  if (configPollTimer) return;
+  if (!isExpanded) return;
   const loop = () => {
     configPollSeq++;
     const t = configPollSeq;
     loadConfig()
       .then(() => {
         if (configPollSeq === t && isExpanded) {
+          populateProviderSelect();
           render();
         }
       })
       .catch(() => {});
   };
-  loop();                        // 立即执行一次
+  loop();
   configPollTimer = setInterval(loop, 3000);
 }
 
@@ -188,8 +219,8 @@ async function setExpandedUI(expanded) {
   body.classList.toggle("open", expanded);
   isExpanded = expanded;
   if (expanded) {
-    // Sync latest data from app on every expand
     await loadConfig();
+    populateProviderSelect();
     await loadModels();
     render();
     startConfigPolling();
@@ -223,7 +254,6 @@ function initToggle() {
   if (!widget) return;
 
   window.addEventListener("mousemove", () => {
-    // 拖拽进行中时不触发展开/收起，避免冲突
     if (isDragging) return;
     if (!isExpanded) {
       expandWidget();
@@ -267,7 +297,7 @@ function initDrag() {
 }
 
 // Provider switch
-$("#providerSelect").addEventListener("change", async (e) => {
+$("#providerSelect")?.addEventListener("change", async (e) => {
   currentProvider = e.target.value;
   await loadModels();
   render();
@@ -279,7 +309,6 @@ $("#widgetKeySelect")?.addEventListener("change", async (e) => {
   const keys = configData[currentProvider]?.keys || [];
   keys.forEach((k) => { k.selected = k.id === id; });
   await saveSelect(currentProvider, { keyId: id });
-  // Refresh models with the newly selected key
   await loadModels();
   render();
   showToast("Key 已切换");
@@ -364,6 +393,7 @@ $("#themeBtn")?.addEventListener("click", async () => {
 document.addEventListener("DOMContentLoaded", async () => {
   setExpandedUI(false);
   await loadConfig();
+  populateProviderSelect();
   await loadModels();
   render();
   await applySavedTheme();
