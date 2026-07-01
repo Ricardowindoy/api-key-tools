@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>API Key Widget</title>
+  <link rel="stylesheet" href="widget.css">
+</head>
+<body>
+  <div class="widget collapsed">
+    <div class="widget-header" id="widgetHeader">
+      <div class="widget-title">🔑</div>
+      <div class="widget-provider">
+        <select id="providerSelect">
+          <option value="stepfun">StepFun 阶跃星辰</option>
+          <option value="opencode">OpenCode</option>
+        </select>
+      </div>
+      <div class="widget-actions">
+        <button id="themeBtn" class="icon-btn" title="切换主题">🌗</button>
+        <button id="autoStartBtn" class="icon-btn" title="开机自启">⏻</button>
+        <button id="resetPosBtn" class="icon-btn" title="重置位置">↺</button>
+      </div>
+    </div>
+    <div class="widget-body" id="widgetBody">
+      <div class="widget-section">
+        <div class="widget-label">Key 选择</div>
+        <div class="widget-key-row">
+          <select class="widget-select" id="widgetKeySelect"><option value="">未选择</option></select>
+          <button class="widget-btn copy-btn" data-action="copyKey">复制</button>
+        </div>
+      </div>
+      <div class="widget-section">
+        <div class="widget-label">模型选择</div>
+        <div class="widget-model-row">
+          <select class="widget-select" id="widgetModelSelect"><option value="">未选择</option></select>
+          <button class="widget-btn copy-btn" data-action="copyModel">复制</button>
+        </div>
+      </div>
+      <div class="widget-section">
+        <div class="widget-label">Base URL</div>
+        <div class="widget-url-row">
+          <div class="widget-display" id="widgetUrl">-</div>
+          <button class="widget-btn copy-btn" data-action="copyUrl">复制 URL</button>
+        </div>
+      </div>
+      <div class="widget-section">
+        <div class="widget-label">完整请求地址</div>
+        <div class="widget-full-row">
+          <div class="widget-full" id="widgetFull">-</div>
+          <button class="widget-btn copy-btn primary" data-action="copyFull">复制完整地址</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="widget.js"></script>
+</body>
+</html>

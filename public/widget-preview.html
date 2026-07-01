@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>小组件 UI 预览</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(99,102,241,0.25), transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(56,189,248,0.18), transparent 40%),
+      linear-gradient(135deg, #0b0d14, #12142a);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    color: #e6e8ef;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 40px 16px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    opacity: 0.9;
+  }
+  .preview {
+    width: 440px;
+    background: rgba(20, 22, 28, 0.72);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid rgba(255,255,255,0.14);
+    border-radius: 9999px;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow:
+      0 18px 40px rgba(0,0,0,0.35),
+      0 0 0 1px rgba(255,255,255,0.04),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    overflow: hidden;
+  }
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 32px;
+    background: rgba(26, 29, 38, 0.52);
+    border-bottom: 1px solid transparent;
+  }
+  .preview-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .preview-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .pill {
+    padding: 6px 12px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(15, 17, 23, 0.55);
+    color: #cdd0da;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease;
+  }
+  .pill:hover { background: rgba(37, 41, 56, 0.8); transform: translateY(-1px); }
+  .pill.primary {
+    background: rgba(37, 99, 235, 0.85);
+    border-color: rgba(37, 99, 235, 0.9);
+    color: #fff;
+  }
+  .preview-body {
+    padding: 10px 16px 12px;
+    display: grid;
+    gap: 12px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .label {
+    font-size: 11px;
+    color: #8b8f9e;
+    min-width: 64px;
+  }
+  .value {
+    flex: 1;
+    font-size: 12px;
+    color: #cdd0da;
+    background: rgba(15, 17, 23, 0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 9999px;
+    padding: 8px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.2px;
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #86efac;
+    padding: 6px 10px;
+    border-radius: 9999px;
+    background: rgba(22, 163, 74, 0.12);
+    border: 1px solid rgba(22, 163, 74, 0.25);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #4ade80, #16a34a);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+  }
+  .note {
+    font-size: 12px;
+    color: #9ca3af;
+    text-align: center;
+    max-width: 440px;
+    line-height: 1.5;
+  }
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .toggle {
+    padding: 8px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(15, 17, 23, 0.5);
+    color: #e5e7eb;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .toggle.active {
+    background: rgba(37, 99, 235, 0.7);
+    border-color: rgba(37, 99, 235, 0.9);
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+  <h1>桌面小组件 UI 预览</h1>
+
+  <div class="preview">
+    <div class="preview-header">
+      <div class="preview-title">🔑 API Key 小组件</div>
+      <div class="preview-actions">
+        <button class="pill" id="themeBtn" title="切换主题">🌗 主题</button>
+        <button class="pill primary" id="copyBtn">复制完整地址</button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <div class="row">
+        <div class="label">Provider</div>
+        <div class="value" style="max-width: 220px;">
+          <select style="background:transparent;color:inherit;border:none;outline:none;font-size:12px;width:100%;">
+            <option>StepFun 阶跃星辰</option>
+            <option>OpenCode</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">当前 Key</div>
+        <div class="value">个人项目 · <span style="opacity:0.4">已配置</span></div>
+        <button class="pill">复制 Key</button>
+      </div>
+      <div class="row">
+        <div class="label">模型</div>
+        <div class="value">step-3.7-flash</div>
+        <button class="pill">复制模型</button>
+      </div>
+      <div class="row">
+        <div class="label">Base URL</div>
+        <div class="value mono">https://api.stepfun.com/v1</div>
+        <button class="pill">复制 URL</button>
+      </div>
+      <div class="row">
+        <div class="label">完整地址</div>
+        <div class="value mono">https://api.stepfun.com/v1/chat/completions<br>MODEL=step-3.7-flash</div>
+      </div>
+      <div class="status"><span class="dot"></span>已连接服务端 · 39871</div>
+    </div>
+  </div>
+
+  <div class="toggle-row">
+    <button class="toggle active" id="collapseBtn">收起态</button>
+    <button class="toggle" id="expandBtn">展开态</button>
+  </div>
+
+  <div class="note">此为静态预览，用于审核视觉风格。<br>确定后我再按这套样式重构真实组件。</div>
+
+  <script>
+    const body = document.querySelector('.preview-body');
+    const collapseBtn = document.getElementById('collapseBtn');
+    const expandBtn = document.getElementById('expandBtn');
+    const themeBtn = document.getElementById('themeBtn');
+    let isDark = true;
+
+    function setState(expanded) {
+      body.style.display = expanded ? 'grid' : 'none';
+      collapseBtn.classList.toggle('active', !expanded);
+      expandBtn.classList.toggle('active', expanded);
+    }
+
+    collapseBtn.onclick = () => setState(false);
+    expandBtn.onclick = () => setState(true);
+
+    themeBtn.onclick = () => {
+      isDark = !isDark;
+      if (isDark) {
+        document.body.style.background =
+          'radial-gradient(circle at 10% 20%, rgba(99,102,241,0.25), transparent 40%), radial-gradient(circle at 90% 80%, rgba(56,189,248,0.18), transparent 40%), linear-gradient(135deg, #0b0d14, #12142a)';
+        document.querySelector('.preview').style.background = 'rgba(20, 22, 28, 0.72)';
+        document.querySelector('.preview').style.color = '#e6e8ef';
+        document.querySelectorAll('.value').forEach(el => {
+          el.style.color = '#cdd0da';
+          el.style.background = 'rgba(15, 17, 23, 0.55)';
+        });
+      } else {
+        document.body.style.background =
+          'radial-gradient(circle at 10% 20%, rgba(255,255,255,0.6), transparent 40%), radial-gradient(circle at 90% 80%, rgba(255,255,255,0.4), transparent 40%), linear-gradient(135deg, #f3f4f6, #e5e7eb)';
+        document.querySelector('.preview').style.background = 'rgba(255, 255, 255, 0.72)';
+        document.querySelector('.preview').style.color = '#111827';
+        document.querySelectorAll('.value').forEach(el => {
+          el.style.color = '#111827';
+          el.style.background = 'rgba(255, 255, 255, 0.65)';
+        });
+      }
+    };
+  </script>
+</body>
+</html>

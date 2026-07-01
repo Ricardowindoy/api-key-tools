@@ -1,0 +1,285 @@
+:root {
+  --widget-bg: rgba(20, 22, 28, 0.82);
+  --widget-border: rgba(255, 255, 255, 0.1);
+  --widget-text: #e6e8ef;
+  --widget-header-bg: rgba(26, 29, 38, 0.6);
+  --widget-input-bg: rgba(15, 17, 23, 0.65);
+  --widget-input-text: #e6e8ef;
+  --widget-muted: #8b8f9e;
+  --widget-secondary-text: #cdd0da;
+  --widget-btn-bg: rgba(30, 33, 48, 0.65);
+  --widget-btn-text: #cdd0da;
+  --widget-btn-hover: rgba(39, 43, 58, 0.75);
+  --widget-primary: rgba(37, 99, 235, 0.9);
+  --widget-primary-hover: rgba(29, 78, 216, 0.95);
+  --widget-success: #16a34a;
+  --widget-toast-bg: rgba(31, 41, 55, 0.9);
+  --widget-toast-border: rgba(55, 65, 81, 0.9);
+  --widget-toast-text: #e5e7eb;
+  --widget-backdrop: blur(18px) saturate(140%);
+}
+
+[data-theme="light"] {
+  --widget-bg: rgba(255, 255, 255, 0.72);
+  --widget-border: rgba(255, 255, 255, 0.7);
+  --widget-text: #111827;
+  --widget-header-bg: rgba(243, 244, 246, 0.55);
+  --widget-input-bg: rgba(255, 255, 255, 0.65);
+  --widget-input-text: #111827;
+  --widget-muted: #6b7280;
+  --widget-secondary-text: #374151;
+  --widget-btn-bg: rgba(229, 231, 235, 0.7);
+  --widget-btn-text: #374151;
+  --widget-btn-hover: rgba(209, 213, 219, 0.8);
+  --widget-primary: rgba(37, 99, 235, 0.85);
+  --widget-primary-hover: rgba(29, 78, 216, 0.9);
+  --widget-success: #16a34a;
+  --widget-toast-bg: rgba(255, 255, 255, 0.85);
+  --widget-toast-border: rgba(229, 231, 235, 0.9);
+  --widget-toast-text: #111827;
+  --widget-backdrop: blur(18px) saturate(140%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  user-select: none;
+}
+
+.widget {
+  min-height: 48px;
+  background: var(--widget-bg);
+  border-radius: 18px;
+  overflow: hidden;
+  color: var(--widget-text);
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+  filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.22));
+}
+
+.widget.collapsed {
+  width: 48px;
+  height: 48px;
+  margin: 6px;
+  border-radius: 50%;
+  background: rgba(20, 22, 28, 0.08);
+  cursor: pointer;
+}
+
+.widget.collapsed .widget-header {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+}
+
+.widget.collapsed .widget-title {
+  font-size: 20px;
+  padding: 0;
+}
+
+.widget.collapsed .widget-provider,
+.widget.collapsed .widget-actions,
+.widget.collapsed .widget-body {
+  display: none;
+}
+
+.widget:not(.collapsed) {
+  margin: 0;
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  height: 36px;
+  background: var(--widget-header-bg);
+  border-bottom: 1px solid transparent;
+  cursor: grab;
+}
+
+.widget-header:active {
+  cursor: grabbing;
+}
+
+.widget-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+
+.widget-provider select {
+  background: var(--widget-input-bg);
+  color: var(--widget-input-text);
+  border: 1px solid var(--widget-border);
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  outline: none;
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+}
+
+.widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  background: var(--widget-btn-bg);
+  color: var(--widget-btn-text);
+  border: 1px solid var(--widget-border);
+  border-radius: 9999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+}
+
+.icon-btn:hover {
+  background: var(--widget-btn-hover);
+}
+
+.icon-btn.active {
+  background: var(--widget-success);
+  border-color: var(--widget-success);
+  color: #fff;
+}
+
+.widget-body {
+  padding: 10px 14px 12px;
+  display: none;
+}
+
+.widget-body.open {
+  display: block;
+}
+
+.widget-section {
+  margin-bottom: 10px;
+}
+
+.widget-section:last-child {
+  margin-bottom: 0;
+}
+
+.widget-label {
+  font-size: 11px;
+  color: var(--widget-muted);
+  margin-bottom: 4px;
+}
+
+.widget-key-row,
+.widget-model-row,
+.widget-url-row,
+.widget-full-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.widget-select {
+  flex: 1;
+  font-size: 12px;
+  color: var(--widget-input-text);
+  background: var(--widget-input-bg);
+  border: 1px solid var(--widget-border);
+  border-radius: 9999px;
+  padding: 5px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+  min-width: 0;
+}
+
+.widget-select:hover,
+.widget-select:focus {
+  border-color: var(--widget-primary);
+}
+
+.widget-display,
+.widget-full {
+  flex: 1;
+  font-size: 12px;
+  color: var(--widget-secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--widget-input-bg);
+  border: 1px solid var(--widget-border);
+  border-radius: 9999px;
+  padding: 5px 8px;
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+}
+
+.widget-btn {
+  background: var(--widget-btn-bg);
+  color: var(--widget-btn-text);
+  border: 1px solid var(--widget-border);
+  border-radius: 9999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+}
+
+.widget-btn:hover {
+  background: var(--widget-btn-hover);
+}
+
+.widget-btn.primary {
+  background: var(--widget-primary);
+  border-color: var(--widget-primary);
+  color: #fff;
+}
+
+.widget-btn.primary:hover {
+  background: var(--widget-primary-hover);
+}
+
+.widget-full {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.toast {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--widget-toast-bg);
+  color: var(--widget-toast-text);
+  border: 1px solid var(--widget-toast-border);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 9999;
+  backdrop-filter: var(--widget-backdrop);
+  -webkit-backdrop-filter: var(--widget-backdrop);
+}
+
+.toast.show {
+  opacity: 1;
+}

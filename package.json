@@ -1,0 +1,39 @@
+{
+  "name": "api-key-manager",
+  "version": "1.0.0",
+  "description": "API Key Manager - Manage API keys for StepFun and OpenCode",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.apikeymanager.app",
+    "productName": "API Key Manager",
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "API Key Manager"
+    },
+    "directories": {
+      "output": "build-dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "!dist/**/*",
+      "!build-dist/**/*",
+      "!.electron-userdata/**/*",
+      "!build.bat",
+      "!app.log"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.0"
+  }
+}

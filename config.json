@@ -1,0 +1,12 @@
+{
+  "stepfun": {
+    "baseUrl": "https://api.stepfun.com/v1",
+    "keys": [],
+    "selectedModel": "stepaudio-2.5-chat"
+  },
+  "opencode": {
+    "baseUrl": "https://opencode.ai/zen/go/v1",
+    "keys": [],
+    "selectedModel": ""
+  }
+}
