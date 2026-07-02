@@ -29,9 +29,43 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 上传构建产物
+      - name: 上传构建产物（Artifact）
         uses: actions/upload-artifact@v5
         with:
           name: api-key-manager-windows
           path: build-dist/
           if-no-files-found: error
+
+      # 仅在推送到 master/main 时发布 Release，dev/PR 只产 artifact
+      - name: 读取版本号
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: 发布到 GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.version }}
+          body: |
+            ## API Key Manager ${{ steps.version.outputs.version }}
+
+            自动构建产物，由 GitHub Actions 推送发布。
+
+            ### 安装
+            下载下方 `.exe` 安装包，双击运行即可。
+
+            ### 来源
+            - 分支: ${{ github.ref_name }}
+            - 提交: ${{ github.sha }}
+          files: build-dist/*.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
