@@ -1,4 +1,7 @@
 // ===== State =====
+// Tauri 重构版：所有后端调用通过 invoke，不再依赖 HTTP 服务器
+const { invoke } = window.__TAURI__.core;
+
 const state = {}; // { [provider]: { baseUrl, keys, models, selectedModel } }
 let saveTimer = null;
 let uid = 0;
@@ -8,7 +11,7 @@ const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
 
 // ===== Toast =====
-function toast(msg, type="success") {
+function toast(msg, type = "success") {
   const c = $(".toast-container");
   const el = document.createElement("div");
   el.className = `toast ${type}`;
@@ -20,105 +23,112 @@ function toast(msg, type="success") {
 // ===== Auto-save =====
 function autoSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveConfig, 600); }
 
-// 定向更新选中项，避免全量覆写导致 widget 数据丢失
+// 定向更新选中项
 async function saveSelect(provider, { keyId, modelId } = {}) {
-  const payload = { provider };
-  if (keyId !== undefined) payload.keyId = keyId;
-  if (modelId !== undefined) payload.modelId = modelId;
   try {
-    const r = await fetch("/api/config/select", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) });
-    if (!r.ok) toast("保存失败", "error");
-  } catch(e) { console.error("save select:", e); toast("保存失败", "error"); }
+    await invoke("save_select", {
+      provider,
+      keyId: keyId ?? null,
+      modelId: modelId ?? null,
+    });
+  } catch (e) {
+    console.error("save select:", e);
+    toast("保存失败", "error");
+  }
 }
 
 async function saveConfig() {
   const config = {};
-  Object.keys(state).forEach(p => {
-    config[p] = { baseUrl: state[p].baseUrl, keys: state[p].keys, selectedModel: state[p].selectedModel };
+  // 转换为 Rust 端期望的 snake_case 格式
+  Object.keys(state).forEach((p) => {
+    config[p] = {
+      base_url: state[p].baseUrl,
+      keys: state[p].keys,
+      selected_model: state[p].selectedModel,
+    };
   });
   try {
-    const r = await fetch("/api/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(config) });
-    if (r.ok) $$(".badge").forEach(b => { b.textContent="已保存"; b.classList.add("saved"); });
-    else toast("保存失败", "error");
-  } catch(e) { console.error("save:", e); toast("保存失败", "error"); }
+    await invoke("save_config", { config });
+    $$(".badge").forEach((b) => { b.textContent = "已保存"; b.classList.add("saved"); });
+  } catch (e) {
+    console.error("save:", e);
+    toast("保存失败", "error");
+  }
 }
 
 async function loadConfig() {
   try {
-    const r = await fetch(`/api/config?_t=${Date.now()}`);
-    if (!r.ok) return;
-    const c = await r.json();
-    // 清空 state，从服务器重新构建
-    Object.keys(state).forEach(p => delete state[p]);
-    Object.keys(c).forEach(p => {
+    const c = await invoke("get_config");
+    Object.keys(state).forEach((p) => delete state[p]);
+    Object.keys(c).forEach((p) => {
+      const section = c[p] || {};
       state[p] = {
-        baseUrl: c[p].baseUrl || "",
-        keys: Array.isArray(c[p].keys) ? c[p].keys : [],
-        models: state[p]?.models || [],
-        selectedModel: c[p].selectedModel || "",
+        baseUrl: section.base_url || "",
+        keys: Array.isArray(section.keys) ? section.keys : [],
+        models: [],
+        selectedModel: section.selected_model || "",
       };
     });
-  } catch(e) { console.error("load:", e); }
+  } catch (e) {
+    console.error("load:", e);
+  }
 }
 
-// 刷新 config 并同步 widget 端的选中状态变更，但保留本地 keys（不覆盖添加/删除）
+// 从后端刷新（同步 widget 端的选中项变更）
 async function refreshFromServer() {
   try {
-    const r = await fetch(`/api/config?_t=${Date.now()}`);
-    if (!r.ok) return;
-    const c = await r.json();
-    Object.keys(c).forEach(p => {
+    const c = await invoke("get_config");
+    Object.keys(c).forEach((p) => {
       if (!state[p]) {
-        state[p] = { baseUrl: c[p].baseUrl || "", keys: [], models: [], selectedModel: "" };
+        state[p] = { baseUrl: c[p].base_url || "", keys: [], models: [], selectedModel: "" };
       }
-      state[p].selectedModel = c[p].selectedModel || state[p].selectedModel;
-      state[p].baseUrl = c[p].baseUrl || state[p].baseUrl;
+      state[p].selectedModel = c[p].selected_model || state[p].selectedModel;
+      state[p].baseUrl = c[p].base_url || state[p].baseUrl;
       if (Array.isArray(c[p].keys)) {
-        state[p].keys.forEach(localKey => {
-          const serverKey = c[p].keys.find(sk => sk.id === localKey.id);
+        state[p].keys.forEach((localKey) => {
+          const serverKey = c[p].keys.find((sk) => sk.id === localKey.id);
           if (serverKey) localKey.selected = !!serverKey.selected;
         });
       }
     });
     renderAllCards();
-  } catch(e) { console.error("refresh:", e); }
+  } catch (e) {
+    console.error("refresh:", e);
+  }
 }
 
 // ===== Helpers =====
 function getSelectedKey(provider) {
-  return state[provider]?.keys.find(k => k.selected) || state[provider]?.keys[0] || { key:"" };
+  return state[provider]?.keys.find((k) => k.selected) || state[provider]?.keys[0] || { key: "" };
 }
-
 function getBaseUrl(provider) {
   return state[provider]?.baseUrl || "";
 }
-
 function maskKey(key) {
   if (!key) return "";
-  if (key.length <= 8) return key.slice(0,2) + "***";
-  return key.slice(0,6) + "..." + key.slice(-4);
+  if (key.length <= 8) return key.slice(0, 2) + "***";
+  return key.slice(0, 6) + "..." + key.slice(-4);
 }
-
 function normalizeModels(raw) {
   if (!Array.isArray(raw)) return [];
-  return raw.map(m => {
-    if (typeof m === "string") return { id: m, description:"" };
-    return { id: m.id || m.model || m.name || "", description: m.description || "" };
-  }).filter(m => m.id);
+  return raw
+    .map((m) => {
+      if (typeof m === "string") return { id: m, description: "" };
+      return { id: m.id || m.model || m.name || "", description: m.description || "" };
+    })
+    .filter((m) => m.id);
 }
 
 // ===== 动态卡片渲染 =====
 function renderAllCards() {
   const container = document.getElementById("cardsContainer");
   container.innerHTML = "";
-  // 按字母顺序排列
   const providers = Object.keys(state).sort();
-  providers.forEach(p => { renderCard(p); });
+  providers.forEach((p) => { renderCard(p); });
 }
 
 function renderCard(provider) {
   const container = document.getElementById("cardsContainer");
-  // 如果已存在则跳过
   if (document.querySelector(`[data-provider="${provider}"]`)) return;
 
   const card = document.createElement("section");
@@ -212,7 +222,7 @@ function renderKeyList(provider) {
   const data = state[provider];
   if (!data) return;
   const keys = data.keys;
-  const selectedId = keys.find(k => k.selected)?.id || "";
+  const selectedId = keys.find((k) => k.selected)?.id || "";
 
   el.innerHTML = "";
   if (keys.length === 0) {
@@ -220,7 +230,7 @@ function renderKeyList(provider) {
     return;
   }
 
-  keys.forEach(k => {
+  keys.forEach((k) => {
     const item = document.createElement("div");
     item.className = `key-item${k.id === selectedId ? " active" : ""}`;
     item.dataset.id = k.id;
@@ -262,13 +272,13 @@ function renderKeyList(provider) {
 function addKey(provider, name, key) {
   const id = genId();
   state[provider].keys.push({ id, name: name || `Key ${state[provider].keys.length + 1}`, key, selected: true });
-  state[provider].keys.forEach(k => { if (k.id !== id) k.selected = false; });
+  state[provider].keys.forEach((k) => { if (k.id !== id) k.selected = false; });
   renderKeyList(provider);
   saveConfig();
 }
 
 function removeKey(provider, id) {
-  const idx = state[provider].keys.findIndex(k => k.id === id);
+  const idx = state[provider].keys.findIndex((k) => k.id === id);
   if (idx === -1) return;
   const wasSelected = state[provider].keys[idx].selected;
   state[provider].keys.splice(idx, 1);
@@ -280,7 +290,7 @@ function removeKey(provider, id) {
 }
 
 function selectKey(provider, id) {
-  state[provider].keys.forEach(k => { k.selected = k.id === id; });
+  state[provider].keys.forEach((k) => { k.selected = k.id === id; });
   renderKeyList(provider);
   saveSelect(provider, { keyId: id });
 }
@@ -291,7 +301,6 @@ async function addProvider(name, baseUrl) {
   if (state[name]) { toast("厂商 \"" + name + "\" 已存在", "error"); return; }
   state[name] = { baseUrl, keys: [], models: [], selectedModel: "" };
   renderCard(name);
-  // 更新 sub
   updateCardSub(name);
   await saveConfig();
   toast("厂商 \"" + name + "\" 已添加");
@@ -312,9 +321,9 @@ function renderModelList(provider) {
   const data = state[provider];
   if (!data) return;
   const models = data.models;
-  const selId  = data.selectedModel;
+  const selId = data.selectedModel;
   el.innerHTML = "";
-  models.forEach(m => {
+  models.forEach((m) => {
     const item = document.createElement("div");
     item.className = "model-item" + (m.id === selId ? " active" : "");
     item.dataset.id = m.id;
@@ -334,7 +343,7 @@ function renderModelList(provider) {
       if (select) select.value = m.id;
       showDesc(provider);
       showCopy(provider);
-      el.querySelectorAll(".model-item").forEach(x => x.classList.remove("active"));
+      el.querySelectorAll(".model-item").forEach((x) => x.classList.remove("active"));
       item.classList.add("active");
     });
     el.appendChild(item);
@@ -344,22 +353,27 @@ function renderModelList(provider) {
 function showDesc(provider) {
   const el = document.getElementById(`desc-${provider}`);
   const id = state[provider]?.selectedModel;
-  const desc = state[provider]?.models.find(m => m.id === id)?.description;
+  const desc = state[provider]?.models.find((m) => m.id === id)?.description;
   if (el) {
-    id && desc ? (el.textContent = desc, el.style.display = "") : el.style.display = "none";
+    if (id && desc) { el.textContent = desc; el.style.display = ""; }
+    else el.style.display = "none";
   }
 }
 
 function showCopy(provider) {
-  const el   = document.getElementById(`copy-${provider}`);
+  const el = document.getElementById(`copy-${provider}`);
   const prev = document.getElementById(`preview-${provider}`);
   const data = state[provider];
   if (!data) return;
   const model = data.selectedModel;
-  const key   = getSelectedKey(provider).key;
+  const key = getSelectedKey(provider).key;
   const baseUrl = getBaseUrl(provider);
-  if (model && key) { if (el) el.style.display = ""; if (prev) prev.textContent = `BASE_URL="${baseUrl}"\nAPI_KEY="${key}"\nMODEL="${model}"`; }
-  else              { if (el) el.style.display = "none"; }
+  if (model && key) {
+    if (el) el.style.display = "";
+    if (prev) prev.textContent = `BASE_URL="${baseUrl}"\nAPI_KEY="${key}"\nMODEL="${model}"`;
+  } else {
+    if (el) el.style.display = "none";
+  }
 }
 
 function updateCardSub(provider) {
@@ -370,33 +384,37 @@ function updateCardSub(provider) {
 }
 
 async function fetchModels(provider) {
-  const statusEl   = document.getElementById(`status-${provider}`);
-  const select     = document.getElementById(`select-${provider}`);
+  const statusEl = document.getElementById(`status-${provider}`);
+  const select = document.getElementById(`select-${provider}`);
   const refreshBtn = document.querySelector(`[data-provider="${provider}"].btn-refresh`);
-  const key        = getSelectedKey(provider).key;
-  const baseUrl    = getBaseUrl(provider);
+  const key = getSelectedKey(provider).key;
+  const baseUrl = getBaseUrl(provider);
 
-  if (!baseUrl) { if (statusEl) { statusEl.textContent="未配置 Base URL"; statusEl.className="status error"; } return; }
+  if (!baseUrl) {
+    if (statusEl) { statusEl.textContent = "未配置 Base URL"; statusEl.className = "status error"; }
+    return;
+  }
 
   const isBuiltin = !key;
   if (statusEl) {
     statusEl.textContent = isBuiltin ? "未配置 API Key，无法查询模型" : "正在查询…";
-    statusEl.className   = "status loading";
+    statusEl.className = "status loading";
   }
   if (refreshBtn) refreshBtn.disabled = true;
   if (select) select.disabled = true;
 
   try {
-    const r = await fetch(`/api/models/${provider}`, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, baseUrl }) });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "查询失败");
-
-    const models = normalizeModels(data.models || []);
-    state[provider].models = models;
+    const models = await invoke("fetch_models_command", {
+      provider,
+      baseUrl,
+      key,
+    });
+    const normalized = normalizeModels(models || []);
+    state[provider].models = normalized;
 
     if (select) {
       select.innerHTML = '<option value="">请选择模型</option>';
-      models.forEach(m => {
+      normalized.forEach((m) => {
         const opt = document.createElement("option");
         opt.value = m.id; opt.textContent = m.id; opt.title = m.description || "";
         select.appendChild(opt);
@@ -404,19 +422,23 @@ async function fetchModels(provider) {
     }
 
     const saved = state[provider].selectedModel;
-    if (saved && models.some(m => m.id === saved) && select) select.value = saved;
+    if (saved && normalized.some((m) => m.id === saved) && select) select.value = saved;
 
     renderModelList(provider);
     if (select) select.disabled = false;
     if (statusEl) {
-      statusEl.textContent = data.fromBuiltin ? `无 Key，未能查询模型` : `找到 ${models.length} 个模型`;
-      statusEl.className   = "status success";
+      statusEl.textContent = isBuiltin ? `无 Key，未能查询模型` : `找到 ${normalized.length} 个模型`;
+      statusEl.className = "status success";
     }
 
     if (select && select.value) { showDesc(provider); showCopy(provider); }
-    else { const cp = document.getElementById(`copy-${provider}`); if (cp) cp.style.display = "none"; }
+    else {
+      const cp = document.getElementById(`copy-${provider}`);
+      if (cp) cp.style.display = "none";
+    }
   } catch (e) {
-    if (statusEl) { statusEl.textContent = e.message; statusEl.className = "status error"; }
+    const msg = typeof e === "string" ? e : (e.message || "查询失败");
+    if (statusEl) { statusEl.textContent = msg; statusEl.className = "status error"; }
     if (select) select.disabled = true;
   } finally {
     if (refreshBtn) refreshBtn.disabled = false;
@@ -439,33 +461,32 @@ function copyToClipboard(text) {
 
 function handleCopy(e, provider) {
   const type = e.currentTarget.dataset.type;
-  const key   = getSelectedKey(provider).key;
+  const key = getSelectedKey(provider).key;
   const baseUrl = getBaseUrl(provider);
   const model = state[provider]?.selectedModel;
   if (!model) return;
   let text = "";
   switch (type) {
     case "baseUrl": text = baseUrl; break;
-    case "key":     text = key;     break;
-    case "model":   text = model;   break;
-    case "all":     text = `BASE_URL="${baseUrl}"\nAPI_KEY="${key}"\nMODEL="${model}"`; break;
+    case "key": text = key; break;
+    case "model": text = model; break;
+    case "all": text = `BASE_URL="${baseUrl}"\nAPI_KEY="${key}"\nMODEL="${model}"`; break;
   }
   if (text) copyToClipboard(text);
 }
 
 // ===== Init Card =====
 function initCard(provider) {
-  // Key inputs
-  const addBtn    = document.querySelector(`.btn-add-key[data-provider="${provider}"]`);
+  const addBtn = document.querySelector(`.btn-add-key[data-provider="${provider}"]`);
   const nameInput = document.getElementById(`newname-${provider}`);
-  const keyInput  = document.getElementById(`newkey-${provider}`);
-  const saveBtn   = document.querySelector(`.btn-save-key[data-provider="${provider}"]`);
+  const keyInput = document.getElementById(`newkey-${provider}`);
+  const saveBtn = document.querySelector(`.btn-save-key[data-provider="${provider}"]`);
   const cancelBtn = document.querySelector(`.btn-cancel-key[data-provider="${provider}"]`);
-  const formEl    = document.getElementById(`keyform-${provider}`);
+  const formEl = document.getElementById(`keyform-${provider}`);
   const refreshBtn = document.querySelector(`.btn-refresh[data-provider="${provider}"]`);
-  const select    = document.getElementById(`select-${provider}`);
+  const select = document.getElementById(`select-${provider}`);
   const deleteBtn = document.querySelector(`.btn-delete-provider[data-provider="${provider}"]`);
-  const urlText   = document.getElementById(`urltext-${provider}`);
+  const urlText = document.getElementById(`urltext-${provider}`);
 
   renderKeyList(provider);
 
@@ -474,7 +495,6 @@ function initCard(provider) {
       if (formEl) formEl.style.display = formEl.style.display === "none" ? "" : "none";
     });
   }
-
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
       if (formEl) formEl.style.display = "none";
@@ -482,11 +502,10 @@ function initCard(provider) {
       if (keyInput) keyInput.value = "";
     });
   }
-
   if (saveBtn) {
     saveBtn.addEventListener("click", () => {
       const name = nameInput?.value.trim() || "";
-      const key  = keyInput?.value.trim() || "";
+      const key = keyInput?.value.trim() || "";
       if (!key) { toast("请输入 API Key", "error"); return; }
       addKey(provider, name, key);
       if (formEl) formEl.style.display = "none";
@@ -495,7 +514,6 @@ function initCard(provider) {
       toast("Key 已添加");
     });
   }
-
   if (keyInput) {
     keyInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && saveBtn) saveBtn.click(); });
   }
@@ -524,7 +542,7 @@ function initCard(provider) {
       if (!state[provider]) return;
       state[provider].selectedModel = select.value;
       showDesc(provider);
-      document.querySelectorAll(`#list-${provider} .model-item`).forEach(item => {
+      document.querySelectorAll(`#list-${provider} .model-item`).forEach((item) => {
         item.classList.toggle("active", item.dataset.id === select.value);
       });
       if (select.value) showCopy(provider);
@@ -533,15 +551,13 @@ function initCard(provider) {
     });
   }
 
-  // Copy buttons
   const copySection = document.getElementById(`copy-${provider}`);
   if (copySection) {
-    copySection.querySelectorAll(".copy-btn").forEach(btn => {
-      btn.addEventListener("click", e => handleCopy(e, provider));
+    copySection.querySelectorAll(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => handleCopy(e, provider));
     });
   }
 
-  // Delete provider
   if (deleteBtn) {
     deleteBtn.addEventListener("click", () => {
       deletePendingProvider = provider;
@@ -557,7 +573,6 @@ function initCard(provider) {
 function getTheme() {
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 }
-
 function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const btn = document.getElementById("themeToggle");
@@ -566,11 +581,10 @@ function setTheme(theme) {
 
 async function applySavedTheme() {
   try {
-    const theme = await window.electronApp?.getTheme();
+    const theme = await invoke("get_theme");
     setTheme(theme);
   } catch {
-    const saved = localStorage.getItem("theme");
-    setTheme(saved === "light" ? "light" : "dark");
+    setTheme("dark");
   }
 }
 
@@ -580,21 +594,17 @@ let deletePendingProvider = null;
 async function main() {
   await loadConfig();
   renderAllCards();
-
   await applySavedTheme();
 
-  // Theme toggle
   const themeBtn = document.getElementById("themeToggle");
   if (themeBtn) {
     themeBtn.addEventListener("click", async () => {
       const next = getTheme() === "dark" ? "light" : "dark";
       setTheme(next);
-      localStorage.setItem("theme", next);
-      try { await window.electronApp?.setTheme(next); } catch {}
+      try { await invoke("set_theme", { theme: next, scope: "app" }); } catch {}
     });
   }
 
-  // Add provider
   const addBtn = document.getElementById("addProviderBtn");
   if (addBtn) {
     addBtn.addEventListener("click", () => {
@@ -620,7 +630,6 @@ async function main() {
     document.getElementById("providerModal").style.display = "none";
   });
 
-  // Delete confirm
   document.getElementById("confirmDeleteBtn")?.addEventListener("click", async () => {
     if (deletePendingProvider) {
       await deleteProvider(deletePendingProvider);
@@ -634,14 +643,13 @@ async function main() {
     document.getElementById("deleteModal").style.display = "none";
   });
 
-  // 点击遮罩层关闭弹窗
-  $$(".modal-overlay").forEach(el => {
+  $$(".modal-overlay").forEach((el) => {
     el.addEventListener("click", (e) => {
       if (e.target === el) el.style.display = "none";
     });
   });
 
-  // 窗口重新聚焦时从服务器刷新，同步 widget 端的选中项变更
+  // 窗口重新聚焦时刷新
   window.addEventListener("focus", refreshFromServer);
 }
 document.addEventListener("DOMContentLoaded", main);

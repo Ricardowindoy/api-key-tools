@@ -1,4 +1,4 @@
-name: Build & Package
+name: Build & Release
 
 on:
   push:
@@ -9,7 +9,17 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: linux
+          - platform: windows-latest
+            target: windows
+          - platform: macos-latest
+            target: macos
+    runs-on: ${{ matrix.platform }}
     permissions:
       contents: write
 
@@ -21,51 +31,63 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: npm
 
-      - name: 安装依赖
-        run: npm ci
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: 安装 ImageMagick（用于生成 ICO 图标）
-        shell: pwsh
-        run: choco install imagemagick -y --no-progress
+      - name: 缓存 Rust 编译产物
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
-      - name: 生成 Windows ICO 图标（多尺寸）
-        shell: pwsh
-        run: magick convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+      - name: 安装 Linux 系统依赖
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
-      - name: 更新 package.json 图标配置为 ICO
+      - name: 安装 Tauri CLI
+        run: cargo install tauri-cli --version "^2.0" --locked
+
+      - name: 生成 Windows ICO 图标
+        if: matrix.target == 'windows'
         shell: pwsh
         run: |
-          $pkg = Get-Content package.json | ConvertFrom-Json
-          $pkg.build.icon = "build/icon.ico"
-          $pkg.build.win.icon = "build/icon.ico"
-          $pkg.build.nsis.installerIcon = "build/icon.ico"
-          $pkg.build.nsis.uninstallerIcon = "build/icon.ico"
-          $pkg.build.nsis.installerHeaderIcon = "build/icon.ico"
-          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+          choco install imagemagick -y --no-progress
+          magick convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+          # 更新 tauri.conf.json 使用 ico
+          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
+          $conf.bundle.icon = @("build/icon.ico")
+          $conf.app.windows | ForEach-Object { $_.icon = "build/icon.ico" }
+          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
 
-      - name: 打包应用（Windows NSIS 安装包）
-        run: npm run build:win
+      - name: 构建应用
+        run: cargo tauri build
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-      - name: 上传构建产物（Artifact）
+      - name: 上传构建产物
         uses: actions/upload-artifact@v5
         with:
-          name: api-key-manager-windows
-          path: build-dist/
-          if-no-files-found: error
+          name: api-key-manager-${{ matrix.target }}
+          path: |
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.app
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.rpm
+          if-no-files-found: warn
 
       - name: 读取版本号
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
         id: version
-        shell: pwsh
+        shell: bash
         run: |
-          $pkg = Get-Content package.json | ConvertFrom-Json
-          $ver = "v" + $pkg.version
-          Write-Output "version=$ver" >> $env:GITHUB_OUTPUT
-          Write-Output "tag=$ver" >> $env:GITHUB_OUTPUT
+          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
 
       - name: 发布到 GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
@@ -76,15 +98,23 @@ jobs:
           body: |
             ## API Key Manager ${{ steps.version.outputs.version }}
 
-            自动构建产物，由 GitHub Actions 推送发布。
+            自动构建产物（Tauri 重构版），由 GitHub Actions 推送发布。
 
-            ### 安装
-            下载下方 `.exe` 安装包，双击运行即可。
+            ### 下载
+            - Windows: `.exe` / `.msi` 安装包
+            - macOS: `.dmg` 安装包
+            - Linux: `.deb` / `.AppImage`
 
             ### 来源
             - 分支: ${{ github.ref_name }}
+            - 平台: ${{ matrix.target }}
             - 提交: ${{ github.sha }}
-          files: build-dist/*.exe
+          files: |
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
           draft: false
           prerelease: false
           generate_release_notes: true

@@ -1,3 +1,7 @@
+// Tauri 重构版 widget：所有后端调用通过 invoke
+const { invoke } = window.__TAURI__.core;
+const { getCurrentWindow } = window.__TAURI__.window;
+
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -5,73 +9,70 @@ let configData = {};
 let modelsData = {};
 let currentProvider = "";
 let providerList = [];
+let isExpanded = false;
+let isDragging = false;
+let autoHideTimer = null;
+let configPollTimer = null;
+let configPollSeq = 0;
 
+// ===== 主题 =====
 function getTheme() {
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 }
-
 function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const btn = $("#themeBtn");
   if (btn) btn.textContent = theme === "light" ? "🌞" : "🌗";
 }
-
 async function applySavedTheme() {
   try {
-    const theme = await window.electronWidget.getTheme();
+    const theme = await invoke("get_theme");
     setTheme(theme);
   } catch {
     setTheme("dark");
   }
 }
 
+// ===== 配置加载 =====
 async function loadConfig() {
   try {
-    const r = await fetch(`/api/config?_t=${Date.now()}`);
-    if (r.ok) configData = await r.json();
+    configData = await invoke("get_config");
   } catch (e) {
     console.error("config load:", e);
   }
 }
 
 async function loadModels() {
-  const providerData = configData[currentProvider] || {};
-  const selectedKey = getSelectedKey();
+  const section = configData[currentProvider];
+  if (!section) return;
+  const keys = section.keys || [];
+  const selectedKey = keys.find((k) => k.selected) || keys[0];
   const apiKey = selectedKey?.key || "";
-  const baseUrl = providerData.baseUrl || "";
+  const baseUrl = section.base_url || "";
   if (!apiKey || !baseUrl) {
     modelsData[currentProvider] = [];
     return;
   }
   try {
-    const r = await fetch(`/api/models/${currentProvider}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: apiKey, baseUrl }),
+    const models = await invoke("fetch_models_command", {
+      provider: currentProvider,
+      baseUrl,
+      key: apiKey,
     });
-    if (r.ok) {
-      const data = await r.json();
-      modelsData[currentProvider] = data.models || [];
-    }
+    modelsData[currentProvider] = models || [];
   } catch (e) {
     console.error("models load:", e);
+    modelsData[currentProvider] = [];
   }
 }
 
 async function saveSelect(provider, { keyId, modelId } = {}) {
-  const payload = { provider };
-  if (keyId !== undefined) payload.keyId = keyId;
-  if (modelId !== undefined) payload.modelId = modelId;
   try {
-    const r = await fetch("/api/config/select", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    await invoke("save_select", {
+      provider,
+      keyId: keyId ?? null,
+      modelId: modelId ?? null,
     });
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({}));
-      showToast(data.error || "保存失败");
-    }
   } catch (e) {
     console.error("save select:", e);
     showToast("保存失败");
@@ -100,7 +101,6 @@ function populateProviderSelect() {
     opt.textContent = p;
     select.appendChild(opt);
   });
-  // 保持当前 provider 有效
   if (currentProvider && providerList.includes(currentProvider)) {
     select.value = currentProvider;
   } else {
@@ -110,15 +110,15 @@ function populateProviderSelect() {
 }
 
 function render() {
-  const providerData = configData[currentProvider] || {};
+  const section = configData[currentProvider] || {};
   const selectedKey = getSelectedKey();
-  const baseUrl = providerData.baseUrl || "";
-  const model = providerData.selectedModel || "";
+  const baseUrl = section.base_url || "";
+  const model = section.selected_model || "";
 
-  // Populate key selector
+  // Key 选择器
   const keySelect = $("#widgetKeySelect");
   keySelect.innerHTML = '<option value="">未选择</option>';
-  (providerData.keys || []).forEach((k) => {
+  (section.keys || []).forEach((k) => {
     const opt = document.createElement("option");
     opt.value = k.id;
     const label = k.name || "未命名";
@@ -130,7 +130,7 @@ function render() {
     keySelect.value = selectedKey.id;
   }
 
-  // Populate model selector
+  // 模型选择器
   const modelSelect = $("#widgetModelSelect");
   modelSelect.innerHTML = '<option value="">未选择</option>';
   (modelsData[currentProvider] || []).forEach((m) => {
@@ -144,7 +144,7 @@ function render() {
     modelSelect.value = model;
   }
 
-  // Update displays
+  // 显示
   $("#widgetUrl").textContent = baseUrl || "-";
   if (baseUrl && model) {
     $("#widgetFull").textContent = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
@@ -153,6 +153,7 @@ function render() {
   }
 }
 
+// ===== 复制 =====
 async function copyText(text) {
   if (!text || text === "-") return;
   try {
@@ -180,11 +181,50 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove("show"), 1500);
 }
 
-let isExpanded = false;
-let autoHideTimer = null;
-let configPollTimer = null;
-let configPollSeq = 0;
+// ===== 展开/收起 =====
+async function setExpandedUI(expanded) {
+  const widget = document.querySelector(".widget");
+  const body = document.getElementById("widgetBody");
+  if (!widget || !body) return;
+  widget.classList.toggle("collapsed", !expanded);
+  body.classList.toggle("open", expanded);
+  isExpanded = expanded;
+  // 通过 Tauri command 调整窗口大小
+  try {
+    await invoke("widget_set_expanded", { expanded });
+  } catch (e) {
+    console.error("set expanded:", e);
+  }
+  if (expanded) {
+    await loadConfig();
+    populateProviderSelect();
+    await loadModels();
+    render();
+    startConfigPolling();
+  } else {
+    stopConfigPolling();
+  }
+}
 
+async function expandWidget() {
+  if (isExpanded) return;
+  clearTimeout(autoHideTimer);
+  await setExpandedUI(true);
+}
+
+async function collapseWidget() {
+  if (!isExpanded) return;
+  await setExpandedUI(false);
+}
+
+function resetAutoHide() {
+  clearTimeout(autoHideTimer);
+  if (isExpanded) {
+    autoHideTimer = setTimeout(() => collapseWidget(), 800);
+  }
+}
+
+// ===== 配置轮询（同步主窗口的选中项变更）=====
 function startConfigPolling() {
   if (configPollTimer) return;
   if (!isExpanded) return;
@@ -211,44 +251,7 @@ function stopConfigPolling() {
   }
 }
 
-async function setExpandedUI(expanded) {
-  const widget = document.querySelector(".widget");
-  const body = document.getElementById("widgetBody");
-  if (!widget || !body) return;
-  widget.classList.toggle("collapsed", !expanded);
-  body.classList.toggle("open", expanded);
-  isExpanded = expanded;
-  if (expanded) {
-    await loadConfig();
-    populateProviderSelect();
-    await loadModels();
-    render();
-    startConfigPolling();
-  } else {
-    stopConfigPolling();
-  }
-}
-
-async function expandWidget() {
-  if (isExpanded) return;
-  clearTimeout(autoHideTimer);
-  await setExpandedUI(true);
-  window.electronWidget.setExpanded(true);
-}
-
-function collapseWidget() {
-  if (!isExpanded) return;
-  setExpandedUI(false);
-  window.electronWidget.setExpanded(false);
-}
-
-function resetAutoHide() {
-  clearTimeout(autoHideTimer);
-  if (isExpanded) {
-    autoHideTimer = setTimeout(collapseWidget, 800);
-  }
-}
-
+// ===== 拖动 =====
 function initToggle() {
   const widget = document.querySelector(".widget");
   if (!widget) return;
@@ -272,38 +275,34 @@ function initToggle() {
 }
 
 function initDrag() {
-  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
-
+  // 使用 Tauri 的 startDragging
   window.addEventListener("mousedown", (e) => {
     if (e.target.tagName === "SELECT" || e.target.tagName === "BUTTON" || e.target.tagName === "INPUT") return;
     isDragging = true;
-    e.preventDefault();
-    startX = e.screenX;
-    startY = e.screenY;
-    startLeft = window.screenX || 0;
-    startTop = window.screenY || 0;
+    // 调用 Tauri 原生拖动
+    getCurrentWindow().startDragging();
   });
 
-  window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-    window.moveTo(startLeft + (e.screenX - startX), startTop + (e.screenY - startY));
-  });
-
-  window.addEventListener("mouseup", async (e) => {
+  window.addEventListener("mouseup", async () => {
     if (!isDragging) return;
     isDragging = false;
-    await window.electronWidget.savePosition(startLeft + (e.screenX - startX), startTop + (e.screenY - startY));
+    // 保存位置
+    try {
+      const pos = await getCurrentWindow().outerPosition();
+      await invoke("save_widget_position", { x: pos.x, y: pos.y });
+    } catch (e) {
+      console.error("save position:", e);
+    }
   });
 }
 
-// Provider switch
+// ===== 事件绑定 =====
 $("#providerSelect")?.addEventListener("change", async (e) => {
   currentProvider = e.target.value;
   await loadModels();
   render();
 });
 
-// Key selection
 $("#widgetKeySelect")?.addEventListener("change", async (e) => {
   const id = e.target.value;
   const keys = configData[currentProvider]?.keys || [];
@@ -314,23 +313,22 @@ $("#widgetKeySelect")?.addEventListener("change", async (e) => {
   showToast("Key 已切换");
 });
 
-// Model selection
 $("#widgetModelSelect")?.addEventListener("change", async (e) => {
-  configData[currentProvider].selectedModel = e.target.value;
+  if (!configData[currentProvider]) return;
+  configData[currentProvider].selected_model = e.target.value;
   await saveSelect(currentProvider, { modelId: e.target.value });
   render();
   if (e.target.value) showToast("模型已切换");
 });
 
-// Copy buttons
 $$(".copy-btn").forEach((btn) => {
   btn.addEventListener("click", async (e) => {
     const action = e.currentTarget.dataset.action;
-    const providerData = configData[currentProvider] || {};
+    const section = configData[currentProvider] || {};
     const selectedKey = getSelectedKey();
     const keyValue = selectedKey?.key || "";
-    const baseUrl = providerData.baseUrl || "";
-    const model = providerData.selectedModel || "";
+    const baseUrl = section.base_url || "";
+    const model = section.selected_model || "";
 
     switch (action) {
       case "copyKey":
@@ -350,48 +348,65 @@ $$(".copy-btn").forEach((btn) => {
   });
 });
 
-// Click-to-copy on display items
 $("#widgetUrl")?.addEventListener("click", () => {
-  const providerData = configData[currentProvider] || {};
-  if (providerData.baseUrl) copyText(providerData.baseUrl);
+  const section = configData[currentProvider] || {};
+  if (section.base_url) copyText(section.base_url);
 });
 $("#widgetFull")?.addEventListener("click", () => {
-  const providerData = configData[currentProvider] || {};
+  const section = configData[currentProvider] || {};
   const selectedKey = getSelectedKey();
-  if (providerData.baseUrl && providerData.selectedModel) {
-    copyText(`BASE_URL="${providerData.baseUrl}"\nAPI_KEY="${selectedKey?.key || ""}"\nMODEL="${providerData.selectedModel}"`);
+  if (section.base_url && section.selected_model) {
+    copyText(`BASE_URL="${section.base_url}"\nAPI_KEY="${selectedKey?.key || ""}"\nMODEL="${section.selected_model}"`);
   }
 });
 
+// ===== 自启动 =====
 async function updateAutoStartBtn() {
   const btn = $("#autoStartBtn");
   if (!btn) return;
-  const enabled = await window.electronWidget.getLoginItem();
-  btn.classList.toggle("active", !!enabled);
-  btn.title = enabled ? "已开启开机自启" : "开启开机自启";
+  try {
+    const enabled = await invoke("plugin:autostart|is_enabled");
+    btn.classList.toggle("active", !!enabled);
+    btn.title = enabled ? "已开启开机自启" : "开启开机自启";
+  } catch (e) {
+    console.error("autostart:", e);
+  }
 }
 
 $("#autoStartBtn")?.addEventListener("click", async () => {
-  const current = await window.electronWidget.getLoginItem();
-  const next = !current;
-  await window.electronWidget.setLoginItem(next);
-  updateAutoStartBtn();
-  showToast(next ? "已开启开机自启" : "已关闭开机自启");
+  try {
+    const current = await invoke("plugin:autostart|is_enabled");
+    if (current) {
+      await invoke("plugin:autostart|disable");
+    } else {
+      await invoke("plugin:autostart|enable");
+    }
+    updateAutoStartBtn();
+    showToast(current ? "已关闭开机自启" : "已开启开机自启");
+  } catch (e) {
+    console.error("autostart toggle:", e);
+    showToast("操作失败");
+  }
 });
 
 $("#resetPosBtn")?.addEventListener("click", async () => {
-  window.electronWidget.resetPosition();
-  showToast("已重置为顶部居中，重启生效");
+  try {
+    await invoke("reset_widget_position");
+    showToast("已重置位置，重启生效");
+  } catch (e) {
+    console.error("reset pos:", e);
+  }
 });
 
 $("#themeBtn")?.addEventListener("click", async () => {
   const next = getTheme() === "dark" ? "light" : "dark";
   setTheme(next);
-  await window.electronWidget.setTheme(next);
+  try { await invoke("set_theme", { theme: next }); } catch {}
 });
 
+// ===== 初始化 =====
 document.addEventListener("DOMContentLoaded", async () => {
-  setExpandedUI(false);
+  await setExpandedUI(false);
   await loadConfig();
   populateProviderSelect();
   await loadModels();
