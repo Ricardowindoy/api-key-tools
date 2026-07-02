@@ -9,45 +9,29 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            artifact-name: api-key-manager-linux
-          - os: windows-latest
-            artifact-name: api-key-manager-windows
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 设置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: 安装依赖
         run: npm ci
 
-      - name: 安装系统依赖（Wine，用于交叉编译 Windows 安装包）
-        if: runner.os == 'Linux'
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq wine64 wine32 2>/dev/null || sudo apt-get install -y -qq wine
-
-      - name: 打包应用
-        run: npm run build
+      - name: 打包应用（Windows NSIS 安装包）
+        run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: ${{ matrix.artifact-name }}
+          name: api-key-manager-windows
           path: build-dist/
           if-no-files-found: error
