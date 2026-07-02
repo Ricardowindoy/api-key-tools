@@ -16,151 +16,40 @@
           <button class="theme-toggle" id="themeToggle" title="切换主题">🌗</button>
         </div>
         <p class="topbar-desc">管理多个 API Key，一键复制 OpenAI 格式调用信息</p>
+        <div class="topbar-actions">
+          <button class="btn-add-provider" id="addProviderBtn">+ 添加厂商</button>
+        </div>
       </header>
 
-      <div class="cards">
-
-        <!-- ===== 阶跃星辰 ===== -->
-        <section class="card" data-provider="stepfun">
-          <div class="card-top">
-            <div class="card-identity">
-              <div class="avatar avatar-step">S</div>
-              <div>
-                <div class="card-name">阶跃星辰</div>
-                <div class="card-sub">StepFun &middot; step-3.7-flash</div>
-              </div>
-            </div>
-            <span class="badge" id="badge-stepfun"></span>
-          </div>
-
-          <div class="card-form">
-            <!-- Key 管理区 -->
-            <div class="key-manage">
-              <div class="key-manage-header">
-                <label>已保存的 Key</label>
-                <button class="btn-add-key" id="addkey-stepfun">+ 添加</button>
-              </div>
-              <div class="key-list" id="keylist-stepfun"></div>
-              <div class="key-add-form" id="keyform-stepfun" style="display:none;">
-                <input class="input" id="newname-stepfun" placeholder="备注名（如：主号）" />
-                <input class="input" id="newkey-stepfun" placeholder="sk-..." autocomplete="off" spellcheck="false" />
-                <div class="key-form-actions">
-                  <button class="btn-save-key" id="savekey-stepfun">保存</button>
-                  <button class="btn-cancel-key" id="cancelkey-stepfun">取消</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Base URL</label>
-              <div class="url-chip" data-url="https://api.stepfun.com/v1">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <code>https://api.stepfun.com/v1</code>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>模型</label>
-              <div class="select-row">
-                <select id="select-stepfun" class="select" disabled>
-                  <option value="">点击查询加载模型</option>
-                </select>
-                <button class="btn-refresh" id="refresh-stepfun">刷新</button>
-              </div>
-              <div class="status" id="status-stepfun"></div>
-              <div class="model-desc" id="desc-stepfun" style="display:none;"></div>
-            </div>
-          </div>
-
-          <details class="model-section" open>
-            <summary class="model-summary">&#x1F4D6; 模型介绍</summary>
-            <div class="model-list" id="list-stepfun"></div>
-          </details>
-
-          <div class="copy-section" id="copy-stepfun" style="display:none;">
-            <div class="copy-row">
-              <button class="copy-btn" data-type="baseUrl">Base URL</button>
-              <button class="copy-btn" data-type="key">API Key</button>
-              <button class="copy-btn" data-type="model">Model</button>
-              <button class="copy-btn copy-all" data-type="all">复制全部</button>
-            </div>
-            <div class="copy-preview">
-              <code id="preview-stepfun"></code>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== OpenCode ===== -->
-        <section class="card" data-provider="opencode">
-          <div class="card-top">
-            <div class="card-identity">
-              <div class="avatar avatar-oc">O</div>
-              <div>
-                <div class="card-name">OpenCode</div>
-                <div class="card-sub">opencode.ai &middot; zen/go</div>
-              </div>
-            </div>
-            <span class="badge" id="badge-opencode"></span>
-          </div>
-
-          <div class="card-form">
-            <div class="key-manage">
-              <div class="key-manage-header">
-                <label>已保存的 Key</label>
-                <button class="btn-add-key" id="addkey-opencode">+ 添加</button>
-              </div>
-              <div class="key-list" id="keylist-opencode"></div>
-              <div class="key-add-form" id="keyform-opencode" style="display:none;">
-                <input class="input" id="newname-opencode" placeholder="备注名（如：主号）" />
-                <input class="input" id="newkey-opencode" placeholder="sk-... 或留空" autocomplete="off" spellcheck="false" />
-                <div class="key-form-actions">
-                  <button class="btn-save-key" id="savekey-opencode">保存</button>
-                  <button class="btn-cancel-key" id="cancelkey-opencode">取消</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Base URL</label>
-              <div class="url-chip" data-url="https://opencode.ai/zen/go/v1">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <code>https://opencode.ai/zen/go/v1</code>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>模型</label>
-              <div class="select-row">
-                <select id="select-opencode" class="select" disabled>
-                  <option value="">点击查询加载模型</option>
-                </select>
-                <button class="btn-refresh" id="refresh-opencode">刷新</button>
-              </div>
-              <div class="status" id="status-opencode"></div>
-              <div class="model-desc" id="desc-opencode" style="display:none;"></div>
-            </div>
-          </div>
-
-          <details class="model-section" open>
-            <summary class="model-summary">&#x1F4D6; 模型介绍</summary>
-            <div class="model-list" id="list-opencode"></div>
-          </details>
-
-          <div class="copy-section" id="copy-opencode" style="display:none;">
-            <div class="copy-row">
-              <button class="copy-btn" data-type="baseUrl">Base URL</button>
-              <button class="copy-btn" data-type="key">API Key</button>
-              <button class="copy-btn" data-type="model">Model</button>
-              <button class="copy-btn copy-all" data-type="all">复制全部</button>
-            </div>
-            <div class="copy-preview">
-              <code id="preview-opencode"></code>
-            </div>
-          </div>
-        </section>
-
-      </div>
+      <div class="cards" id="cardsContainer"></div>
     </main>
+  </div>
+
+  <!-- 添加厂商弹窗 -->
+  <div class="modal-overlay" id="providerModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">添加厂商</div>
+      <div class="modal-body">
+        <input class="input" id="newProviderName" placeholder="厂商标识（如：openai）" autocomplete="off" spellcheck="false" />
+        <input class="input" id="newProviderUrl" placeholder="Base URL（如：https://api.openai.com/v1）" autocomplete="off" spellcheck="false" style="margin-top:8px;" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save-key" id="saveProviderBtn">添加</button>
+        <button class="btn-cancel-key" id="cancelProviderBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认弹窗 -->
+  <div class="modal-overlay" id="deleteModal" style="display:none;">
+    <div class="modal modal-sm">
+      <div class="modal-header">确认删除</div>
+      <div class="modal-body" id="deleteModalBody">确定要删除此厂商吗？</div>
+      <div class="modal-footer">
+        <button class="btn-save-key" id="confirmDeleteBtn" style="background:var(--red);">删除</button>
+        <button class="btn-cancel-key" id="cancelDeleteBtn">取消</button>
+      </div>
+    </div>
   </div>
 
   <div class="toast-container"></div>
