@@ -12,9 +12,11 @@
     "appId": "com.apikeymanager.app",
     "productName": "API Key Manager",
     "icon": "build/icon.png",
+    "compression": "maximum",
     "win": {
       "target": [
-        "nsis"
+        "nsis",
+        "portable"
       ],
       "icon": "build/icon.png"
     },
@@ -36,7 +38,16 @@
       "!build-dist/**/*",
       "!.electron-userdata/**/*",
       "!build.bat",
-      "!app.log"
+      "!app.log",
+      "!.git/**/*",
+      "!.github/**/*",
+      "!*.md",
+      "!LICENSE",
+      "!.gitignore",
+      "!.npm-cache/**/*",
+      "!build/logo.svg",
+      "!build/*.png",
+      "!public/favicon.svg"
     ]
   },
   "devDependencies": {
