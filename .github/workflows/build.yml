@@ -1,0 +1,49 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        # 如需本地 macOS 打包可添加 macos-latest
+        # 但 Windows 目标仍可在 ubuntu 上交叉编译
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 安装系统依赖（Wine，用于交叉编译 Windows 安装包）
+        if: runner.os == 'Linux'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine64 wine32 2>/dev/null || sudo apt-get install -y -qq wine
+
+      - name: 打包应用
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-key-manager-${{ runner.os }}
+          path: build-dist/
+          if-no-files-found: error
