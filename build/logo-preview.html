@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Logo 审核 - API Key Manager</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e7ff;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  h1 { font-weight: 300; margin: 0 0 8px; font-size: 28px; }
+  .sub { color: #94a3b8; margin-bottom: 40px; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; margin-bottom: 48px; }
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .card .label { font-size: 12px; color: #94a3b8; }
+  .sizes { display: flex; gap: 20px; align-items: flex-end; }
+  .size-item { text-align: center; }
+  .size-item .dim { font-size: 11px; color: #64748b; margin-top: 6px; }
+  .light {
+    background: #f8fafc;
+    color: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(139,92,246,0.2);
+    color: #c4b5fd;
+    border-radius: 999px;
+    font-size: 11px;
+    margin-bottom: 16px;
+  }
+  .desc { max-width: 600px; text-align: center; color: #94a3b8; font-size: 13px; line-height: 1.7; }
+</style>
+</head>
+<body>
+  <span class="badge">设计草案</span>
+  <h1>API Key Manager</h1>
+  <p class="sub">Logo 审核预览</p>
+
+  <div class="row">
+    <div class="card">
+      <img src="logo.svg" width="256" height="256" alt="logo">
+      <span class="label">主 Logo (256×256)</span>
+    </div>
+    <div class="card">
+      <div class="light">
+        <img src="logo.svg" width="128" height="128" alt="logo">
+      </div>
+      <span class="label">浅色背景适配</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 40px;">
+    <span class="label" style="margin-bottom: 8px;">多尺寸适配预览</span>
+    <div class="sizes">
+      <div class="size-item">
+        <img src="logo.svg" width="64" height="64">
+        <div class="dim">64px</div>
+      </div>
+      <div class="size-item">
+        <img src="logo.svg" width="48" height="48">
+        <div class="dim">48px</div>
+      </div>
+      <div class="size-item">
+        <img src="logo.svg" width="32" height="32">
+        <div class="dim">32px</div>
+      </div>
+      <div class="size-item">
+        <img src="logo.svg" width="16" height="16">
+        <div class="dim">16px</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="desc">
+    <strong>设计理念：</strong>紫蓝渐变背景象征科技与智能，中央白色钥匙代表 API Key 管理的核心功能，
+    底层半透明齿轮寓意"配置 / 管理"，整体采用圆角方形适配现代应用图标规范。
+  </p>
+</body>
+</html>
