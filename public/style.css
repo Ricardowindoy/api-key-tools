@@ -76,6 +76,13 @@ body {
   gap: 10px;
 }
 
+.logo-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
 .theme-toggle {
   width: 34px;
   height: 34px;

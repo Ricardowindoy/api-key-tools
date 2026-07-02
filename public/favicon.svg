@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="keyShine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E0E7FF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- 圆角矩形背景 -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+
+  <!-- 齿轮（底层装饰） -->
+  <g opacity="0.18" fill="#FFFFFF" transform="translate(256 256)">
+    <circle r="150"/>
+    <g>
+      <rect x="-18" y="-185" width="36" height="50" rx="8"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(45)"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(90)"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(135)"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(180)"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(225)"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(270)"/>
+      <rect x="-18" y="-185" width="36" height="50" rx="8" transform="rotate(315)"/>
+    </g>
+    <circle r="60" fill="url(#bg)"/>
+  </g>
+
+  <!-- 钥匙主体 -->
+  <g filter="url(#shadow)" transform="translate(256 256)">
+    <!-- 钥匙环（圆环） -->
+    <circle cx="-70" cy="0" r="62" fill="none" stroke="url(#keyShine)" stroke-width="26"/>
+    <!-- 钥匙杆 -->
+    <rect x="-8" y="-16" width="140" height="32" rx="16" fill="url(#keyShine)"/>
+    <!-- 钥匙齿 1 -->
+    <rect x="80" y="16" width="22" height="40" rx="6" fill="url(#keyShine)"/>
+    <!-- 钥匙齿 2 -->
+    <rect x="115" y="16" width="17" height="30" rx="6" fill="url(#keyShine)"/>
+    <!-- 钥匙环内圆点（点缀） -->
+    <circle cx="-70" cy="0" r="14" fill="#6366F1"/>
+  </g>
+</svg>

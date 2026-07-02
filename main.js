@@ -174,6 +174,7 @@ function createMainWindow() {
     frame: true,
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0f1117",
+    icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -213,6 +214,7 @@ function createWidgetWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: true,
+    icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

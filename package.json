@@ -11,13 +11,20 @@
   "build": {
     "appId": "com.apikeymanager.app",
     "productName": "API Key Manager",
+    "icon": "build/icon.png",
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "API Key Manager"
+      "shortcutName": "API Key Manager",
+      "installerIcon": "build/icon.png",
+      "uninstallerIcon": "build/icon.png",
+      "installerHeaderIcon": "build/icon.png"
     },
     "directories": {
       "output": "build-dist"
