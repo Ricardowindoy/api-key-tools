@@ -24,6 +24,25 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      - name: 安装 ImageMagick（用于生成 ICO 图标）
+        shell: pwsh
+        run: choco install imagemagick -y --no-progress
+
+      - name: 生成 Windows ICO 图标（多尺寸）
+        shell: pwsh
+        run: magick convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
+
+      - name: 更新 package.json 图标配置为 ICO
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $pkg.build.icon = "build/icon.ico"
+          $pkg.build.win.icon = "build/icon.ico"
+          $pkg.build.nsis.installerIcon = "build/icon.ico"
+          $pkg.build.nsis.uninstallerIcon = "build/icon.ico"
+          $pkg.build.nsis.installerHeaderIcon = "build/icon.ico"
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+
       - name: 打包应用（Windows NSIS 安装包）
         run: npm run build:win
         env:
@@ -36,15 +55,15 @@ jobs:
           path: build-dist/
           if-no-files-found: error
 
-      # 仅在推送到 master/main 时发布 Release，dev/PR 只产 artifact
       - name: 读取版本号
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
         id: version
-        shell: bash
+        shell: pwsh
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $ver = "v" + $pkg.version
+          Write-Output "version=$ver" >> $env:GITHUB_OUTPUT
+          Write-Output "tag=$ver" >> $env:GITHUB_OUTPUT
 
       - name: 发布到 GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
