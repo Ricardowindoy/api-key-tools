@@ -10,10 +10,14 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # 如需本地 macOS 打包可添加 macos-latest
-        # 但 Windows 目标仍可在 ubuntu 上交叉编译
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            artifact-name: api-key-manager-linux
+          - os: windows-latest
+            artifact-name: api-key-manager-windows
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -44,6 +48,6 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: api-key-manager-${{ runner.os }}
+          name: ${{ matrix.artifact-name }}
           path: build-dist/
           if-no-files-found: error
