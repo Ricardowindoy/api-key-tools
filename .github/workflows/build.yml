@@ -46,16 +46,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
+      - name: 安装 cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2.0" --locked
+        run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
 
       - name: 生成 Windows ICO 图标
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
-          choco install imagemagick -y --no-progress
-          magick convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
-          # 更新 tauri.conf.json 使用 ico（仅在 bundle.icon 中设置，窗口级别不允许 icon）
           $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
           $conf.bundle.icon = @("../build/icon.ico")
           $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
@@ -161,8 +161,11 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: 安装 cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2.0" --locked
+        run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
 
       - name: 验证 Android 环境
         run: |
@@ -238,8 +241,11 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: 安装 cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2.0" --locked
+        run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
 
       - name: 初始化 iOS 工程
         run: cargo tauri ios init
