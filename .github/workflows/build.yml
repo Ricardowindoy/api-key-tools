@@ -47,16 +47,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
-      - name: 安装 cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-
       - name: 安装 Tauri CLI
-        run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
+        run: cargo install tauri-cli --version "^2.0" --locked
 
       - name: 生成 Windows ICO 图标
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
+          choco install imagemagick -y --no-progress
+          magick convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
           $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
           $conf.bundle.icon = @("../build/icon.ico")
           $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
@@ -121,7 +120,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ===== Android 构建 =====
+  # ===== Android 构建（等桌面端跑完，避免并发超限）=====
   android:
     needs: build
     runs-on: ubuntu-22.04
@@ -143,13 +142,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 安装 Android SDK 组件
-        run: |
-          echo "SDK root: ${ANDROID_SDK_ROOT}"
-          # accept licenses
-          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/*/bin/sdkmanager --licenses 2>/dev/null || true
-          # install required packages
-          ${ANDROID_SDK_ROOT}/cmdline-tools/*/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-34
+            build-tools;34.0.0
 
       - name: 安装 Android NDK
         uses: nttld/setup-ndk@v1
@@ -163,71 +161,23 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: 安装 cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-
       - name: 安装 Tauri CLI
-        run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
-
-      - name: 验证 Android 环境
-        run: |
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
-          echo "JAVA_HOME_17_X64=${JAVA_HOME_17_X64}"
-          echo "NDK_HOME=${{ steps.setup_ndk.outputs.ndk-path }}"
-          ls -la ${ANDROID_SDK_ROOT}/cmdline-tools/*/bin/sdkmanager 2>&1 || true
-          ls -la ${{ steps.setup_ndk.outputs.ndk-path }}/source.properties 2>&1 || true
+        run: cargo install tauri-cli --version "^2.0" --locked
 
       - name: 初始化 Android 工程
-        shell: bash
-        run: |
-          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
-          export JAVA_HOME="${JAVA_HOME_17_X64}"
-          export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
-          echo "ANDROID_HOME=${ANDROID_HOME}"
-          echo "JAVA_HOME=${JAVA_HOME}"
-          echo "NDK_HOME=${NDK_HOME}"
-          cargo tauri android init --ci
+        run: cargo tauri android init
+        env:
+          NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
 
-      - name: 生成 Android 图标资源
-        shell: bash
-        run: |
-          cargo tauri icon build/icon.png
-        # 如果生成失败不阻断构建（使用默认图标）
+      - name: 生成 Android 图标资源（替换默认 Tauri 图标）
+        run: cargo tauri icon build/icon.png
         continue-on-error: true
 
-      - name: 生成自签 keystore 并配置签名
-        shell: bash
-        run: |
-          ANDROID_DIR="src-tauri/gen/android"
-          
-          # 生成临时 keystore
-          keytool -genkeypair -v \
-            -keystore "${ANDROID_DIR}/app/debug.keystore" \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug, O=Android, C=US"
-
-          # 写入 tauri.properties 配置签名（Tauri 原生支持）
-          PROPS_FILE="${ANDROID_DIR}/app/tauri.properties"
-          cat >> "${PROPS_FILE}" << 'PROPEOF'
-
-keystorePath=app/debug.keystore
-keystorePassword=android
-keystoreAlias=androiddebugkey
-keystoreAliasPassword=android
-PROPEOF
-          
-          echo "tauri.properties 签名配置已写入"
-          cat "${PROPS_FILE}"
-
-      - name: 构建 Android APK（release，自签名，arm64 单架构）
-        shell: bash
-        run: |
-          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
-          export JAVA_HOME="${JAVA_HOME_17_X64}"
-          export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
-          cargo tauri android build --apk --release --target aarch64 --ci
+      - name: 构建 Android APK（debug，无需签名证书）
+        run: cargo tauri android build --apk --debug --target aarch64
+        env:
+          NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
@@ -255,4 +205,3 @@ PROPEOF
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
