@@ -186,26 +186,14 @@ jobs:
           echo "NDK_HOME=${NDK_HOME}"
           cargo tauri android init --ci
 
-      - name: 限制 Android 架构为 arm64-v8a
-        shell: bash
-        run: |
-          GRADLE_FILE="src-tauri/gen/android/app/tauri.build.gradle.kts"
-          if [ -f "$GRADLE_FILE" ]; then
-            sed -i '/abiFilters += setOf(/,/)/c\    abiFilters += setOf(\"arm64-v8a\")' "$GRADLE_FILE"
-            echo "Patched abiFilters in $GRADLE_FILE"
-            grep -n "abiFilters" "$GRADLE_FILE"
-          else
-            echo "WARNING: $GRADLE_FILE not found, trying alternative path"
-            find src-tauri/gen/android -name "*.gradle.kts" -o -name "*.gradle" 2>/dev/null || true
-          fi
 
-      - name: 构建 Android APK（debug，无需签名）
+      - name: 构建 Android APK（debug，arm64 单架构）
         shell: bash
         run: |
           export ANDROID_HOME="${ANDROID_SDK_ROOT}"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
           export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
-          cargo tauri android build --apk --debug --ci
+          cargo tauri android build --apk --debug --target aarch64 --ci
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
