@@ -17,6 +17,7 @@
         <div class="topbar-title">
           <img src="favicon.svg" class="logo-icon" alt="logo">
           <h1>API Keys</h1>
+          <button class="topbar-icon-btn" id="mobileSyncBtn" title="同步">🔄</button>
           <button class="theme-toggle" id="themeToggle" title="切换主题">🌗</button>
         </div>
         <p class="topbar-desc">管理多个 API Key，一键复制 OpenAI 格式调用信息</p>
@@ -28,6 +29,8 @@
 
       <div class="cards" id="cardsContainer"></div>
     </main>
+
+    <button class="fab-add" id="fabAddBtn" title="添加厂商">+</button>
   </div>
 
   <!-- 添加厂商弹窗 -->
@@ -173,6 +176,6 @@
   </div>
 
   <div class="toast-container"></div>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

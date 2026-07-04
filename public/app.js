@@ -919,17 +919,18 @@ async function main() {
   }
 
   const addBtn = document.getElementById("addProviderBtn");
-  if (addBtn) {
-    addBtn.addEventListener("click", () => {
-      const modal = document.getElementById("providerModal");
-      if (modal) modal.style.display = "";
-      const input = document.getElementById("newProviderName");
-      if (input) input.value = "";
-      const urlInput = document.getElementById("newProviderUrl");
-      if (urlInput) urlInput.value = "";
-      if (input) input.focus();
-    });
-  }
+  const fabAddBtn = document.getElementById("fabAddBtn");
+  const openProviderModal = () => {
+    const modal = document.getElementById("providerModal");
+    if (modal) modal.style.display = "";
+    const input = document.getElementById("newProviderName");
+    if (input) input.value = "";
+    const urlInput = document.getElementById("newProviderUrl");
+    if (urlInput) urlInput.value = "";
+    if (input) input.focus();
+  };
+  if (addBtn) addBtn.addEventListener("click", openProviderModal);
+  if (fabAddBtn) fabAddBtn.addEventListener("click", openProviderModal);
 
   const providerNameInput = document.getElementById("newProviderName");
   const providerUrlInput = document.getElementById("newProviderUrl");
@@ -973,12 +974,13 @@ async function main() {
 
   // ===== 同步 UI 事件绑定 =====
   const syncBtn = document.getElementById("syncBtn");
-  if (syncBtn) {
-    syncBtn.addEventListener("click", () => {
-      const modal = document.getElementById("syncModal");
-      if (modal) modal.style.display = "";
-    });
-  }
+  const mobileSyncBtn = document.getElementById("mobileSyncBtn");
+  const openSyncModal = () => {
+    const modal = document.getElementById("syncModal");
+    if (modal) modal.style.display = "";
+  };
+  if (syncBtn) syncBtn.addEventListener("click", openSyncModal);
+  if (mobileSyncBtn) mobileSyncBtn.addEventListener("click", openSyncModal);
 
   document.getElementById("syncCloseBtn")?.addEventListener("click", () => {
     document.getElementById("syncModal").style.display = "none";
