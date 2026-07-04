@@ -15,6 +15,8 @@ let currentProvider = "";
 let providerList = [];
 let isExpanded = false;
 let isDragging = false;
+let isSnapping = false;
+let isInitializing = false;
 let autoHideTimer = null;
 let configPollTimer = null;
 let configPollSeq = 0;
@@ -208,11 +210,14 @@ async function setExpandedUI(expanded) {
     startConfigPolling();
   } else {
     stopConfigPolling();
+    // 收起后吸附到最近的屏幕边缘（初始化时跳过，保留已保存的位置）
+    if (!isInitializing) snapToEdge();
   }
 }
 
 async function expandWidget() {
   if (isExpanded) return;
+  if (isSnapping) return; // 吸附动画进行中，避免位置/尺寸冲突
   clearTimeout(autoHideTimer);
   await setExpandedUI(true);
 }
@@ -220,6 +225,33 @@ async function expandWidget() {
 async function collapseWidget() {
   if (!isExpanded) return;
   await setExpandedUI(false);
+}
+
+// ===== 边缘吸附 =====
+async function snapToEdge() {
+  if (isSnapping) return false;
+  isSnapping = true;
+  try {
+    const moved = await invoke("widget_snap_to_edge");
+    if (moved) {
+      // 触发吸附脉冲动画
+      const widget = document.querySelector(".widget");
+      if (widget) {
+        widget.classList.remove("snapped");
+        // 强制重排以重新触发动画
+        void widget.offsetWidth;
+        widget.classList.add("snapped");
+        setTimeout(() => widget.classList.remove("snapped"), 500);
+      }
+    }
+    return moved;
+  } catch (e) {
+    console.error("snap:", e);
+    return false;
+  } finally {
+    // 等待 Rust 端 ~200ms 动画完成后再放行
+    setTimeout(() => { isSnapping = false; }, 260);
+  }
 }
 
 function resetAutoHide() {
@@ -299,13 +331,24 @@ function initDrag() {
   window.addEventListener("mouseup", async () => {
     if (!isDragging) return;
     isDragging = false;
-    // 保存位置
-    try {
-      const pos = await getCurrentWindow().outerPosition();
-      await invoke("save_widget_position", { x: pos.x, y: pos.y });
-    } catch (e) {
-      console.error("save position:", e);
-      showToast("保存位置失败: " + (e?.message || String(e)));
+    // 收起态：吸附到最近的屏幕边缘；展开态：仅保存位置
+    if (!isExpanded) {
+      await snapToEdge();
+      // 兜底保存（snap 内部也会写位置，失败时回退）
+      try {
+        const pos = await getCurrentWindow().outerPosition();
+        await invoke("save_widget_position", { x: pos.x, y: pos.y });
+      } catch (e) {
+        console.error("save position:", e);
+      }
+    } else {
+      try {
+        const pos = await getCurrentWindow().outerPosition();
+        await invoke("save_widget_position", { x: pos.x, y: pos.y });
+      } catch (e) {
+        console.error("save position:", e);
+        showToast("保存位置失败: " + (e?.message || String(e)));
+      }
     }
   });
 }
@@ -420,7 +463,9 @@ $("#themeBtn")?.addEventListener("click", async () => {
 
 // ===== 初始化 =====
 document.addEventListener("DOMContentLoaded", async () => {
+  isInitializing = true;
   await setExpandedUI(false);
+  isInitializing = false;
   await loadConfig();
   populateProviderSelect();
   await loadModels();

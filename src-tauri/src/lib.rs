@@ -127,6 +127,91 @@ fn widget_set_expanded(app: tauri::AppHandle, expanded: bool) -> Result<(), Stri
     Ok(())
 }
 
+/// 收起态下吸附到最近屏幕边缘（含缓动动画）
+/// 仅在 collapsed 状态调用，避免与展开尺寸冲突。
+#[tauri::command]
+async fn widget_snap_to_edge(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri::{Manager, PhysicalPosition};
+
+    let win = app
+        .get_webview_window("widget")
+        .ok_or("widget window not found")?;
+
+    let monitor = win
+        .current_monitor()
+        .map_err(|e| e.to_string())?
+        .ok_or("no current monitor")?;
+
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+    let scale = monitor.scale_factor();
+
+    let win_pos = win.outer_position().map_err(|e| e.to_string())?;
+    let win_size = win.outer_size().map_err(|e| e.to_string())?;
+
+    let (w_w, w_h) = (win_size.width as i32, win_size.height as i32);
+    let cx = win_pos.x + w_w / 2;
+    let cy = win_pos.y + w_h / 2;
+
+    let mon_left = mon_pos.x;
+    let mon_top = mon_pos.y;
+    let mon_right = mon_pos.x + mon_size.width as i32;
+    let mon_bottom = mon_pos.y + mon_size.height as i32;
+
+    // 8 逻辑像素的边距
+    let margin = (8.0 * scale).round() as i32;
+    let y_lo = mon_top + margin;
+    let y_hi = (mon_bottom - margin - w_h).max(y_lo);
+    let x_lo = mon_left + margin;
+    let x_hi = (mon_right - margin - w_w).max(x_lo);
+
+    let d_left = cx - mon_left;
+    let d_right = mon_right - cx;
+    let d_top = cy - mon_top;
+    let d_bottom = mon_bottom - cy;
+    let min_dist = d_left.min(d_right).min(d_top).min(d_bottom);
+
+    let (target_x, target_y) = if min_dist == d_left {
+        (x_lo, win_pos.y.clamp(y_lo, y_hi))
+    } else if min_dist == d_right {
+        (x_hi, win_pos.y.clamp(y_lo, y_hi))
+    } else if min_dist == d_top {
+        (win_pos.x.clamp(x_lo, x_hi), y_lo)
+    } else {
+        (win_pos.x.clamp(x_lo, x_hi), y_hi)
+    };
+
+    // 已经吸附就不再触发动画
+    if target_x == win_pos.x && target_y == win_pos.y {
+        return Ok(false);
+    }
+
+    // 后台线程执行 ~200ms 缓动动画，避免阻塞 IPC
+    let win_clone = win.clone();
+    let app_clone = app.clone();
+    let from_x = win_pos.x;
+    let from_y = win_pos.y;
+    std::thread::spawn(move || {
+        let steps = 24u32;
+        let interval_ms = 8u64;
+        for i in 1..=steps {
+            let t = i as f64 / steps as f64;
+            // easeOutCubic
+            let e = 1.0 - (1.0 - t).powi(3);
+            let x = (from_x as f64 + (target_x - from_x) as f64 * e).round() as i32;
+            let y = (from_y as f64 + (target_y - from_y) as f64 * e).round() as i32;
+            let _ = win_clone.set_position(PhysicalPosition::new(x, y));
+            std::thread::sleep(std::time::Duration::from_millis(interval_ms));
+        }
+        let _ = state::patch_widget_state(&app_clone, |s| {
+            s.x = Some(target_x);
+            s.y = Some(target_y);
+        });
+    });
+
+    Ok(true)
+}
+
 /// 显示 widget 窗口
 #[tauri::command]
 fn widget_show(app: tauri::AppHandle) -> Result<(), String> {
@@ -191,6 +276,7 @@ pub fn run() {
             save_widget_position,
             reset_widget_position,
             widget_set_expanded,
+            widget_snap_to_edge,
             widget_show,
             widget_hide,
             get_app_version,
