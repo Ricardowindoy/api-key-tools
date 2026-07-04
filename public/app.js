@@ -2,6 +2,7 @@
 // Tauri 重构版：所有后端调用通过 invoke，不再依赖 HTTP 服务器
 const nav = window.__TAURI__;
 const core = nav?.core;
+const tauriEvent = nav?.event;
 const invoke = core?.invoke ? core.invoke.bind(core) : (...args) => Promise.reject("Tauri invoke not available");
 console.log("__TAURI__ IPC:", !!core?.invoke);
 
@@ -907,7 +908,7 @@ async function p2pStartShare() {
     syncLog("P2P 分享已启动：" + addr, "info");
 
     try {
-      const unlisten = await appWindow.listen("p2p-data-received", (event) => {
+      const unlisten = await tauriEvent.listen("p2p-data-received", (event) => {
         p2pHandleReceived(event.payload);
       });
       p2pUnlistenFn = unlisten;

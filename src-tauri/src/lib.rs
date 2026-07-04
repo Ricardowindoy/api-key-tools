@@ -305,6 +305,7 @@ fn p2p_start_server(app: tauri::AppHandle) -> Result<(String, String), String> {
         port,
         initial_payload,
         move |received_json| {
+            use tauri::Emitter;
             let _ = app_handle.emit("p2p-data-received", received_json);
         },
     )?;

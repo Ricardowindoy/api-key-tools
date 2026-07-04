@@ -4,7 +4,6 @@
 //! 传输的是加密后的 payload（RSA-2048-OAEP + AES-256-GCM），
 //! 即使在局域网内被嗅探也无法解密。
 
-use std::io::Read;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -93,7 +92,7 @@ impl P2PServer {
         let payload_clone = payload_json.clone();
 
         thread::spawn(move || {
-            for request in server.incoming_requests() {
+            for mut request in server.incoming_requests() {
                 if !*running_clone.lock().unwrap() {
                     let _ = request.respond(
                         Response::from_string("server stopped")
