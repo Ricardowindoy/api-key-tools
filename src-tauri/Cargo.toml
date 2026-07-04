@@ -1,6 +1,6 @@
 [package]
 name = "api-key-manager"
-version = "1.0.0"
+version = "1.1.0"
 description = "API Key Manager - Manage API keys for any AI provider"
 authors = ["Ricardowindoy"]
 edition = "2021"
