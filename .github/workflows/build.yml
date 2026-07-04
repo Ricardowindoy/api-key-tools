@@ -237,20 +237,25 @@ jobs:
           
           echo "签名后的 APK: ${SIGNED_APK}"
 
+      - name: 重命名 APK（统一命名风格）
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          APK_DIR="src-tauri/gen/android/app/build/outputs/apk/release"
+          OLD="${APK_DIR}/app-release-signed.apk"
+          NEW="${APK_DIR}/API-Key-Manager_${VERSION}_android-arm64.apk"
+          mv "${OLD}" "${NEW}"
+          echo "APK_PATH=${NEW}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "APK 已重命名为: $(basename "${NEW}")"
+
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
         with:
           name: api-key-manager-android
           path: |
-            src-tauri/gen/android/app/build/outputs/apk/release/app-release-signed.apk
+            ${{ env.APK_PATH }}
           if-no-files-found: warn
-
-      - name: 读取版本号
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        shell: bash
-        run: |
-          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: 发布 APK 到 GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
@@ -258,7 +263,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           files: |
-            src-tauri/gen/android/app/build/outputs/apk/release/app-release-signed.apk
+            ${{ env.APK_PATH }}
           draft: false
           prerelease: true
         env:
