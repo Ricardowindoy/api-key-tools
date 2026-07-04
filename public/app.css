@@ -1095,6 +1095,11 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
     --radius-sm: 9px;
   }
 
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .app { padding: 0 16px; }
   .main { padding: 20px 0 60px; }
 
@@ -1180,7 +1185,12 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 
   .sync-section-title { font-size: 13px; margin-bottom: 10px; }
 
-  .sync-row { flex-direction: column; align-items: stretch; }
+  .sync-row { gap: 8px; }
+
+  .sync-key-actions,
+  .sync-manual-actions {
+    flex-wrap: wrap;
+  }
 
   .sync-url-input { width: 100%; }
 
@@ -1191,13 +1201,14 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
     font-size: 14px;
   }
 
-  .sync-key-actions .btn,
-  .sync-manual-actions .btn {
-    flex: 1 1 calc(50% - 5px);
+  .sync-key-actions button,
+  .sync-manual-actions button {
+    flex: 1 1 calc(50% - 4px);
     min-width: 0;
     height: 44px;
     font-size: 13px;
     padding: 0 12px;
+    white-space: nowrap;
   }
 
   .sync-key-actions,
@@ -1214,6 +1225,12 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
     font-size: 12px;
     padding: 12px;
     line-height: 1.6;
+  }
+
+  .btn-save-key, .btn-cancel-key {
+    height: 44px;
+    padding: 0 16px;
+    font-size: 14px;
   }
 
   .sync-key-textarea {
