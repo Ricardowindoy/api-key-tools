@@ -87,7 +87,7 @@ jobs:
           export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
           echo "ANDROID_HOME=${ANDROID_HOME}"
           echo "NDK_HOME=${NDK_HOME}"
-          cargo tauri android build --apk --release --target aarch64
+          cargo tauri android build --apk --target aarch64
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
