@@ -15,6 +15,9 @@
         "transparent": false,
         "url": "index.html"
       }
-    ]
+    ],
+    "android": {
+      "rustTargets": ["aarch64-linux-android"]
+    }
   }
 }
