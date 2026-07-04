@@ -4,6 +4,7 @@
 mod config;
 mod models;
 mod state;
+mod sync;
 
 use config::{Config, WidgetProviderInfo};
 use models::ModelInfo;
@@ -103,6 +104,154 @@ fn save_widget_position(app: tauri::AppHandle, x: i32, y: i32) -> Result<(), Str
 #[tauri::command]
 fn reset_widget_position(app: tauri::AppHandle) -> Result<(), String> {
     state::clear_widget_position(&app)
+}
+
+// ===== 同步 / 加密 Commands =====
+
+/// 生成 RSA-2048 密钥对并保存到同步状态
+#[tauri::command]
+fn sync_generate_keypair(app: tauri::AppHandle) -> Result<state::SyncState, String> {
+    let kp = sync::generate_keypair()?;
+    state::patch_sync_state(&app, |s| {
+        s.private_key_pem = Some(kp.private_pem);
+        s.public_key_pem = Some(kp.public_pem);
+    })?;
+    Ok(state::load_sync_state(&app))
+}
+
+/// 获取当前同步状态
+#[tauri::command]
+fn sync_get_state(app: tauri::AppHandle) -> state::SyncState {
+    state::load_sync_state(&app)
+}
+
+/// 保存同步 URL
+#[tauri::command]
+fn sync_set_url(app: tauri::AppHandle, url: Option<String>) -> Result<(), String> {
+    state::patch_sync_state(&app, |s| {
+        s.sync_url = url;
+    })
+}
+
+/// 设置自动同步间隔（分钟），传 None 关闭自动同步
+#[tauri::command]
+fn sync_set_auto_interval(app: tauri::AppHandle, minutes: Option<u64>) -> Result<(), String> {
+    state::patch_sync_state(&app, |s| {
+        s.auto_sync_interval_min = minutes;
+    })
+}
+
+/// 导入私钥（自动推导公钥并保存）
+#[tauri::command]
+fn sync_import_private_key(app: tauri::AppHandle, private_pem: String) -> Result<state::SyncState, String> {
+    sync::validate_private_key(&private_pem)?;
+    let public_pem = sync::public_from_private(&private_pem)?;
+    state::patch_sync_state(&app, |s| {
+        s.private_key_pem = Some(private_pem);
+        s.public_key_pem = Some(public_pem);
+    })?;
+    Ok(state::load_sync_state(&app))
+}
+
+/// 导入公钥（仅用于加密导出，无法解密）
+#[tauri::command]
+fn sync_import_public_key(app: tauri::AppHandle, public_pem: String) -> Result<state::SyncState, String> {
+    sync::validate_public_key(&public_pem)?;
+    state::patch_sync_state(&app, |s| {
+        s.public_key_pem = Some(public_pem);
+    })?;
+    Ok(state::load_sync_state(&app))
+}
+
+/// 清除密钥
+#[tauri::command]
+fn sync_clear_keys(app: tauri::AppHandle) -> Result<state::SyncState, String> {
+    state::patch_sync_state(&app, |s| {
+        s.private_key_pem = None;
+        s.public_key_pem = None;
+    })?;
+    Ok(state::load_sync_state(&app))
+}
+
+/// 用公钥加密当前配置，返回加密后的 JSON 字符串
+#[tauri::command]
+fn sync_encrypt_config(app: tauri::AppHandle) -> Result<String, String> {
+    let ss = state::load_sync_state(&app);
+    let pub_key = ss.public_key_pem.ok_or("未配置公钥")?;
+    let cfg = config::load_config(&app);
+    sync::encrypt_config_to_string(&pub_key, &cfg)
+}
+
+/// 从配置的 URL 拉取并解密配置，合并到本地
+/// 返回解密后的配置，由前端决定是否合并
+#[tauri::command]
+async fn sync_fetch_remote(app: tauri::AppHandle) -> Result<Config, String> {
+    let ss = state::load_sync_state(&app);
+    let url = ss.sync_url.clone().ok_or("未配置同步 URL")?;
+    let priv_key = ss.private_key_pem.clone().ok_or("未配置私钥，无法解密")?;
+
+    let result = sync::fetch_and_decrypt(&url, &priv_key).await;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    match &result {
+        Ok(_) => {
+            let _ = state::patch_sync_state(&app, |s| {
+                s.last_sync_at = Some(now);
+                s.last_sync_ok = Some(true);
+                s.last_sync_error = None;
+            });
+        }
+        Err(e) => {
+            let _ = state::patch_sync_state(&app, |s| {
+                s.last_sync_at = Some(now);
+                s.last_sync_ok = Some(false);
+                s.last_sync_error = Some(e.clone());
+            });
+        }
+    }
+
+    result
+}
+
+/// 将远端配置合并到本地（保留本地新增的 key，以远端为基准，本地选中项不被覆盖）
+#[tauri::command]
+fn sync_merge_config(app: tauri::AppHandle, remote: Config) -> Result<(), String> {
+    let mut local = config::load_config(&app);
+    for (provider, remote_cfg) in remote {
+        let local_entry = local.entry(provider.clone()).or_default();
+        // 远端的 base_url 覆盖本地
+        if !remote_cfg.base_url.is_empty() {
+            local_entry.base_url = remote_cfg.base_url;
+        }
+        // 远端的 keys 列表：按 id 合并，远端 key 覆盖同 id 的本地 key
+        for rk in &remote_cfg.keys {
+            if let Some(lk) = local_entry.keys.iter_mut().find(|k| k.id == rk.id) {
+                lk.name = rk.name.clone();
+                lk.key = rk.key.clone();
+            } else {
+                local_entry.keys.push(rk.clone());
+            }
+        }
+        // 远端 selected_model 覆盖本地（如果本地没有选中项）
+        if local_entry.selected_model.is_empty() && !remote_cfg.selected_model.is_empty() {
+            local_entry.selected_model = remote_cfg.selected_model;
+        }
+        // 保证至少一个 key 被选中
+        if !local_entry.keys.is_empty() && !local_entry.keys.iter().any(|k| k.selected) {
+            local_entry.keys[0].selected = true;
+        }
+    }
+    config::save_config(&app, &local)
+}
+
+/// 直接用远端配置覆盖本地
+#[tauri::command]
+fn sync_overwrite_config(app: tauri::AppHandle, remote: Config) -> Result<(), String> {
+    config::save_config(&app, &remote)
 }
 
 // ===== 窗口控制 Commands =====
@@ -281,6 +430,17 @@ pub fn run() {
             get_widget_position,
             save_widget_position,
             reset_widget_position,
+            sync_generate_keypair,
+            sync_get_state,
+            sync_set_url,
+            sync_set_auto_interval,
+            sync_import_private_key,
+            sync_import_public_key,
+            sync_clear_keys,
+            sync_encrypt_config,
+            sync_fetch_remote,
+            sync_merge_config,
+            sync_overwrite_config,
             widget_set_expanded,
             widget_snap_to_edge,
             widget_show,

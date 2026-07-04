@@ -21,6 +21,7 @@
         </div>
         <p class="topbar-desc">管理多个 API Key，一键复制 OpenAI 格式调用信息</p>
         <div class="topbar-actions">
+          <button class="btn-sync" id="syncBtn" title="多端同步">🔄 同步</button>
           <button class="btn-add-provider" id="addProviderBtn">+ 添加厂商</button>
         </div>
       </header>
@@ -56,7 +57,122 @@
     </div>
   </div>
 
+  <!-- 同步设置弹窗 -->
+  <div class="modal-overlay" id="syncModal" style="display:none;">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <span>🔐 多端同步设置</span>
+        <span class="sync-status-badge" id="syncStatusBadge">未配置</span>
+      </div>
+      <div class="modal-body">
+        <!-- 同步 URL -->
+        <div class="sync-section">
+          <div class="sync-section-title">同步地址</div>
+          <div class="sync-row">
+            <input class="input sync-url-input" id="syncUrlInput" placeholder="https://example.com/config.enc" autocomplete="off" spellcheck="false" />
+            <button class="btn-save-key" id="syncSaveUrlBtn">保存</button>
+          </div>
+          <div class="sync-hint">从此 URL GET 请求获取加密配置，支持任意静态托管服务</div>
+        </div>
+
+        <!-- 密钥管理 -->
+        <div class="sync-section">
+          <div class="sync-section-title">密钥管理</div>
+          <div class="sync-key-status" id="syncKeyStatus">
+            <span class="sync-key-icon">🔒</span>
+            <span>尚未配置密钥对</span>
+          </div>
+          <div class="sync-row sync-key-actions">
+            <button class="btn-save-key" id="syncGenKeyBtn">生成密钥对</button>
+            <button class="btn-cancel-key" id="syncImportPrivBtn">导入私钥</button>
+            <button class="btn-cancel-key" id="syncImportPubBtn">导入公钥</button>
+            <button class="btn-cancel-key" id="syncClearKeysBtn" style="background:var(--red);color:#fff;">清除密钥</button>
+          </div>
+          <div class="sync-key-detail" id="syncKeyDetail" style="display:none;">
+            <div class="sync-key-row">
+              <div class="sync-key-label">公钥（可分享）</div>
+              <div class="sync-key-value">
+                <textarea class="sync-key-textarea" id="syncPubKeyText" readonly></textarea>
+                <button class="btn-copy-mini" data-target="syncPubKeyText">复制</button>
+              </div>
+            </div>
+            <div class="sync-key-row">
+              <div class="sync-key-label">私钥（保密！）</div>
+              <div class="sync-key-value">
+                <textarea class="sync-key-textarea" id="syncPrivKeyText" readonly></textarea>
+                <button class="btn-copy-mini" data-target="syncPrivKeyText">复制</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 自动同步 -->
+        <div class="sync-section">
+          <div class="sync-section-title">自动同步</div>
+          <div class="sync-row">
+            <select class="select sync-interval-select" id="syncIntervalSelect">
+              <option value="0">关闭</option>
+              <option value="1">每 1 分钟</option>
+              <option value="5">每 5 分钟</option>
+              <option value="15">每 15 分钟</option>
+              <option value="30">每 30 分钟</option>
+              <option value="60">每小时</option>
+            </select>
+            <span class="sync-hint" id="syncLastSyncInfo"></span>
+          </div>
+        </div>
+
+        <!-- 手动操作 -->
+        <div class="sync-section">
+          <div class="sync-section-title">手动操作</div>
+          <div class="sync-row sync-manual-actions">
+            <button class="btn-save-key" id="syncPullBtn">⬇ 从 URL 拉取</button>
+            <button class="btn-cancel-key" id="syncExportBtn">⬆ 导出加密配置</button>
+          </div>
+          <div class="sync-log" id="syncLog"></div>
+        </div>
+
+        <!-- 加密说明 -->
+        <div class="sync-footer-note">
+          <strong>安全说明：</strong>
+          使用 RSA-2048-OAEP + AES-256-GCM 混合加密。公钥加密，私钥解密。
+          私钥仅保存在本地，不会上传到任何服务器。
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save-key" id="syncCloseBtn">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入密钥弹窗 -->
+  <div class="modal-overlay" id="syncImportModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header" id="syncImportTitle">导入密钥</div>
+      <div class="modal-body">
+        <textarea class="sync-key-textarea" id="syncImportTextarea" placeholder="粘贴 PEM 格式的密钥..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save-key" id="syncImportConfirmBtn">导入</button>
+        <button class="btn-cancel-key" id="syncImportCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 同步确认弹窗 -->
+  <div class="modal-overlay" id="syncConfirmModal" style="display:none;">
+    <div class="modal modal-sm">
+      <div class="modal-header">同步确认</div>
+      <div class="modal-body" id="syncConfirmBody"></div>
+      <div class="modal-footer">
+        <button class="btn-save-key" id="syncMergeBtn">合并（推荐）</button>
+        <button class="btn-cancel-key" id="syncOverwriteBtn">覆盖本地</button>
+        <button class="btn-cancel-key" id="syncCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container"></div>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -115,6 +115,13 @@ pub fn app_state_path(app: &tauri::AppHandle) -> PathBuf {
         .join("app-state.json")
 }
 
+/// sync-state.json 路径（同步配置 + 密钥）
+pub fn sync_state_path(app: &tauri::AppHandle) -> PathBuf {
+    data_dir(app)
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("sync-state.json")
+}
+
 /// 读取并迁移旧配置（单 key 字段 → keys 数组）
 pub fn load_config(app: &tauri::AppHandle) -> Config {
     let path = config_path(app);

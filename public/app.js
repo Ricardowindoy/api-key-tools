@@ -591,6 +591,314 @@ async function applySavedTheme() {
   }
 }
 
+// ===== 同步功能 =====
+let syncState = null;
+let autoSyncTimer = null;
+let pendingRemoteConfig = null;
+let syncImportMode = "private"; // "private" | "public"
+
+async function syncLoadState() {
+  try {
+    syncState = await invoke("sync_get_state");
+    syncRenderState();
+  } catch (e) {
+    console.error("load sync state:", e);
+  }
+}
+
+function syncRenderState() {
+  if (!syncState) return;
+
+  // URL 输入
+  const urlInput = document.getElementById("syncUrlInput");
+  if (urlInput && urlInput.value !== (syncState.sync_url || "")) {
+    urlInput.value = syncState.sync_url || "";
+  }
+
+  // 状态徽章
+  const badge = document.getElementById("syncStatusBadge");
+  if (badge) {
+    const hasKeys = !!syncState.private_key_pem;
+    const hasUrl = !!syncState.sync_url;
+    if (hasKeys && hasUrl) {
+      badge.textContent = "已就绪";
+      badge.className = "sync-status-badge status-ready";
+    } else if (hasKeys) {
+      badge.textContent = "密钥已配置";
+      badge.className = "sync-status-badge status-partial";
+    } else {
+      badge.textContent = "未配置";
+      badge.className = "sync-status-badge";
+    }
+  }
+
+  // 密钥状态
+  const keyStatus = document.getElementById("syncKeyStatus");
+  const keyDetail = document.getElementById("syncKeyDetail");
+  const pubText = document.getElementById("syncPubKeyText");
+  const privText = document.getElementById("syncPrivKeyText");
+
+  if (syncState.public_key_pem || syncState.private_key_pem) {
+    if (keyStatus) {
+      const hasPriv = !!syncState.private_key_pem;
+      keyStatus.innerHTML = `<span class="sync-key-icon">${hasPriv ? "🔓" : "🔐"}</span><span>${hasPriv ? "密钥对已配置（可加密 + 解密）" : "仅公钥（仅可加密）"}</span>`;
+    }
+    if (keyDetail) keyDetail.style.display = "";
+    if (pubText) pubText.value = syncState.public_key_pem || "";
+    if (privText) privText.value = syncState.private_key_pem || "(未配置)";
+  } else {
+    if (keyStatus) {
+      keyStatus.innerHTML = `<span class="sync-key-icon">🔒</span><span>尚未配置密钥对</span>`;
+    }
+    if (keyDetail) keyDetail.style.display = "none";
+  }
+
+  // 自动同步间隔
+  const intervalSel = document.getElementById("syncIntervalSelect");
+  if (intervalSel) {
+    const val = syncState.auto_sync_interval_min || 0;
+    if (parseInt(intervalSel.value) !== val) intervalSel.value = String(val);
+  }
+
+  // 上次同步信息
+  const lastInfo = document.getElementById("syncLastSyncInfo");
+  if (lastInfo) {
+    if (syncState.last_sync_at) {
+      const t = new Date(syncState.last_sync_at * 1000);
+      const ok = syncState.last_sync_ok;
+      lastInfo.textContent = `上次同步：${t.toLocaleString()} (${ok ? "成功" : "失败"})`;
+      lastInfo.style.color = ok ? "var(--green)" : "var(--red)";
+    } else {
+      lastInfo.textContent = "从未同步";
+      lastInfo.style.color = "";
+    }
+  }
+}
+
+function syncLog(msg, type = "info") {
+  const el = document.getElementById("syncLog");
+  if (!el) return;
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.className = `sync-log-item sync-log-${type}`;
+  div.textContent = `[${time}] ${msg}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function syncGenerateKeypair() {
+  try {
+    const s = await invoke("sync_generate_keypair");
+    syncState = s;
+    syncRenderState();
+    toast("密钥对已生成");
+    syncLog("生成了新的 RSA-2048 密钥对", "success");
+  } catch (e) {
+    toast("生成失败: " + (e?.message || e), "error");
+    syncLog("生成失败: " + (e?.message || e), "error");
+  }
+}
+
+function syncOpenImport(mode) {
+  syncImportMode = mode;
+  const title = document.getElementById("syncImportTitle");
+  const textarea = document.getElementById("syncImportTextarea");
+  if (title) title.textContent = mode === "private" ? "导入私钥" : "导入公钥";
+  if (textarea) { textarea.value = ""; textarea.placeholder = mode === "private" ? "粘贴 PEM 格式的私钥（以 -----BEGIN RSA PRIVATE KEY----- 开头）" : "粘贴 PEM 格式的公钥（以 -----BEGIN RSA PUBLIC KEY----- 开头）"; }
+  const modal = document.getElementById("syncImportModal");
+  if (modal) modal.style.display = "";
+}
+
+async function syncImportKey() {
+  const textarea = document.getElementById("syncImportTextarea");
+  const val = textarea?.value.trim();
+  if (!val) { toast("请输入密钥内容", "error"); return; }
+  try {
+    const cmd = syncImportMode === "private" ? "sync_import_private_key" : "sync_import_public_key";
+    const s = await invoke(cmd, { [syncImportMode === "private" ? "privatePem" : "publicPem"]: val });
+    syncState = s;
+    syncRenderState();
+    toast("导入成功");
+    syncLog(`导入${syncImportMode === "private" ? "私钥" : "公钥"}成功`, "success");
+    document.getElementById("syncImportModal").style.display = "none";
+  } catch (e) {
+    toast("导入失败: " + (e?.message || e), "error");
+    syncLog("导入失败: " + (e?.message || e), "error");
+  }
+}
+
+async function syncClearKeys() {
+  if (!confirm("确定要清除所有密钥吗？清除后将无法解密已有的加密配置。")) return;
+  try {
+    const s = await invoke("sync_clear_keys");
+    syncState = s;
+    syncRenderState();
+    toast("密钥已清除");
+    syncLog("密钥已清除", "info");
+  } catch (e) {
+    toast("清除失败: " + (e?.message || e), "error");
+  }
+}
+
+async function syncSaveUrl() {
+  const urlInput = document.getElementById("syncUrlInput");
+  const url = urlInput?.value.trim() || null;
+  if (url && !/^https?:\/\//i.test(url)) { toast("请输入有效的 HTTP/HTTPS URL", "error"); return; }
+  try {
+    await invoke("sync_set_url", { url });
+    if (syncState) syncState.sync_url = url;
+    syncRenderState();
+    toast("同步地址已保存");
+    syncLog("同步地址已更新: " + (url || "(空)"), "info");
+  } catch (e) {
+    toast("保存失败: " + (e?.message || e), "error");
+  }
+}
+
+async function syncSetInterval() {
+  const sel = document.getElementById("syncIntervalSelect");
+  const val = parseInt(sel?.value || "0");
+  const minutes = val > 0 ? val : null;
+  try {
+    await invoke("sync_set_auto_interval", { minutes });
+    if (syncState) syncState.auto_sync_interval_min = minutes;
+    syncSetupAutoTimer();
+    toast(minutes ? `已设置每 ${minutes} 分钟自动同步` : "已关闭自动同步");
+    syncLog(minutes ? `自动同步间隔设为 ${minutes} 分钟` : "已关闭自动同步", "info");
+  } catch (e) {
+    toast("设置失败: " + (e?.message || e), "error");
+  }
+}
+
+function syncSetupAutoTimer() {
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+  const mins = syncState?.auto_sync_interval_min;
+  if (mins && mins > 0) {
+    autoSyncTimer = setInterval(() => {
+      syncPull(true);
+    }, mins * 60 * 1000);
+  }
+}
+
+async function syncPull(silent = false) {
+  if (!syncState?.sync_url) { if (!silent) toast("请先配置同步 URL", "error"); return; }
+  if (!syncState?.private_key_pem) { if (!silent) toast("请先配置私钥", "error"); return; }
+
+  if (!silent) {
+    syncLog("正在从 " + syncState.sync_url + " 拉取...", "info");
+    const btn = document.getElementById("syncPullBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "同步中..."; }
+  }
+
+  try {
+    const remote = await invoke("sync_fetch_remote");
+    pendingRemoteConfig = remote;
+
+    const providers = Object.keys(remote);
+    const totalKeys = providers.reduce((sum, p) => sum + (remote[p]?.keys?.length || 0), 0);
+
+    if (silent) {
+      // 自动同步默认合并
+      await invoke("sync_merge_config", { remote });
+      await loadConfig();
+      renderAllCards();
+      syncLog(`自动同步完成：${providers.length} 个厂商，${totalKeys} 个 Key`, "success");
+    } else {
+      // 手动同步：弹窗确认
+      const body = document.getElementById("syncConfirmBody");
+      if (body) {
+        body.innerHTML = `
+          <p>从远端获取到：</p>
+          <ul style="margin:8px 0;padding-left:20px;">
+            <li>${providers.length} 个厂商</li>
+            <li>${totalKeys} 个 API Key</li>
+          </ul>
+          <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">选择同步方式：</p>
+        `;
+      }
+      document.getElementById("syncConfirmModal").style.display = "";
+    }
+
+    await syncLoadState();
+  } catch (e) {
+    const msg = e?.message || e;
+    if (!silent) {
+      toast("同步失败: " + msg, "error");
+      syncLog("同步失败: " + msg, "error");
+    } else {
+      syncLog("自动同步失败: " + msg, "error");
+    }
+    await syncLoadState();
+  } finally {
+    if (!silent) {
+      const btn = document.getElementById("syncPullBtn");
+      if (btn) { btn.disabled = false; btn.textContent = "⬇ 从 URL 拉取"; }
+    }
+  }
+}
+
+async function syncDoMerge() {
+  if (!pendingRemoteConfig) return;
+  try {
+    await invoke("sync_merge_config", { remote: pendingRemoteConfig });
+    await loadConfig();
+    renderAllCards();
+    toast("同步成功（已合并）");
+    syncLog("同步完成（合并模式）", "success");
+    document.getElementById("syncConfirmModal").style.display = "none";
+    pendingRemoteConfig = null;
+  } catch (e) {
+    toast("合并失败: " + (e?.message || e), "error");
+  }
+}
+
+async function syncDoOverwrite() {
+  if (!pendingRemoteConfig) return;
+  if (!confirm("确定要用远端配置完全覆盖本地吗？本地所有未同步的更改将丢失。")) return;
+  try {
+    await invoke("sync_overwrite_config", { remote: pendingRemoteConfig });
+    await loadConfig();
+    renderAllCards();
+    toast("同步成功（已覆盖）");
+    syncLog("同步完成（覆盖模式）", "success");
+    document.getElementById("syncConfirmModal").style.display = "none";
+    pendingRemoteConfig = null;
+  } catch (e) {
+    toast("覆盖失败: " + (e?.message || e), "error");
+  }
+}
+
+async function syncExport() {
+  if (!syncState?.public_key_pem) { toast("请先配置公钥", "error"); return; }
+  try {
+    const encrypted = await invoke("sync_encrypt_config");
+    // 下载为文件
+    const blob = new Blob([encrypted], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `api-key-config-${Date.now()}.enc.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("加密配置已导出");
+    syncLog("导出加密配置文件", "success");
+  } catch (e) {
+    toast("导出失败: " + (e?.message || e), "error");
+    syncLog("导出失败: " + (e?.message || e), "error");
+  }
+}
+
+function syncCopyText(targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  navigator.clipboard.writeText(el.value).then(
+    () => toast("已复制"),
+    () => { el.select(); document.execCommand("copy"); toast("已复制"); }
+  );
+}
+
 // ===== Bootstrap =====
 let deletePendingProvider = null;
 
@@ -598,6 +906,8 @@ async function main() {
   await loadConfig();
   renderAllCards();
   await applySavedTheme();
+  await syncLoadState();
+  syncSetupAutoTimer();
 
   const themeBtn = document.getElementById("themeToggle");
   if (themeBtn) {
@@ -660,5 +970,47 @@ async function main() {
 
   // 窗口重新聚焦时刷新
   window.addEventListener("focus", refreshFromServer);
+
+  // ===== 同步 UI 事件绑定 =====
+  const syncBtn = document.getElementById("syncBtn");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => {
+      const modal = document.getElementById("syncModal");
+      if (modal) modal.style.display = "";
+    });
+  }
+
+  document.getElementById("syncCloseBtn")?.addEventListener("click", () => {
+    document.getElementById("syncModal").style.display = "none";
+  });
+
+  document.getElementById("syncSaveUrlBtn")?.addEventListener("click", syncSaveUrl);
+  document.getElementById("syncGenKeyBtn")?.addEventListener("click", syncGenerateKeypair);
+  document.getElementById("syncImportPrivBtn")?.addEventListener("click", () => syncOpenImport("private"));
+  document.getElementById("syncImportPubBtn")?.addEventListener("click", () => syncOpenImport("public"));
+  document.getElementById("syncClearKeysBtn")?.addEventListener("click", syncClearKeys);
+  document.getElementById("syncIntervalSelect")?.addEventListener("change", syncSetInterval);
+  document.getElementById("syncPullBtn")?.addEventListener("click", () => syncPull(false));
+  document.getElementById("syncExportBtn")?.addEventListener("click", syncExport);
+
+  document.getElementById("syncImportConfirmBtn")?.addEventListener("click", syncImportKey);
+  document.getElementById("syncImportCancelBtn")?.addEventListener("click", () => {
+    document.getElementById("syncImportModal").style.display = "none";
+  });
+
+  document.getElementById("syncMergeBtn")?.addEventListener("click", syncDoMerge);
+  document.getElementById("syncOverwriteBtn")?.addEventListener("click", syncDoOverwrite);
+  document.getElementById("syncCancelBtn")?.addEventListener("click", () => {
+    document.getElementById("syncConfirmModal").style.display = "none";
+    pendingRemoteConfig = null;
+  });
+
+  // 复制密钥按钮
+  $$(".btn-copy-mini").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.target;
+      if (target) syncCopyText(target);
+    });
+  });
 }
 document.addEventListener("DOMContentLoaded", main);
