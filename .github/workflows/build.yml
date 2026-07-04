@@ -40,6 +40,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
 
       - name: 安装 Linux 系统依赖
         if: matrix.platform == 'ubuntu-22.04'
@@ -130,6 +131,15 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v5
 
+      - name: 释放磁盘空间
+        run: |
+          echo "=== 清理前 ===" && df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
+          sudo apt-get clean
+          echo "=== 清理后 ===" && df -h /
+
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -158,6 +168,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
 
       - name: 安装 Tauri CLI
         run: cargo install tauri-cli --version "^2.0" --locked
