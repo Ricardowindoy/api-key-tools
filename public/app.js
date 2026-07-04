@@ -596,6 +596,7 @@ let syncState = null;
 let autoSyncTimer = null;
 let pendingRemoteConfig = null;
 let syncImportMode = "private"; // "private" | "public"
+let p2pUnlistenFn = null;
 
 async function syncLoadState() {
   try {
@@ -890,6 +891,129 @@ async function syncExport() {
   }
 }
 
+// ===== P2P 局域网同步 =====
+async function p2pStartShare() {
+  if (!syncState?.public_key_pem) {
+    toast("请先配置公钥（用于加密分享内容）", "error");
+    return;
+  }
+  try {
+    const [addr, qrcodeSvg] = await invoke("p2p_start_server");
+    document.getElementById("p2pQrCode").innerHTML = qrcodeSvg;
+    document.getElementById("p2pAddr").textContent = addr;
+    document.getElementById("p2pShareArea").style.display = "";
+    document.getElementById("p2pConnectArea").style.display = "none";
+    toast("分享已启动");
+    syncLog("P2P 分享已启动：" + addr, "info");
+
+    try {
+      const unlisten = await appWindow.listen("p2p-data-received", (event) => {
+        p2pHandleReceived(event.payload);
+      });
+      p2pUnlistenFn = unlisten;
+    } catch (e) {
+      console.warn("listen p2p-data-received failed:", e);
+    }
+  } catch (e) {
+    toast("启动失败: " + (e?.message || e), "error");
+  }
+}
+
+async function p2pStop() {
+  try {
+    await invoke("p2p_stop_server");
+    document.getElementById("p2pShareArea").style.display = "none";
+    document.getElementById("p2pConnectArea").style.display = "";
+    toast("已停止分享");
+    syncLog("P2P 分享已停止", "info");
+    if (p2pUnlistenFn) { p2pUnlistenFn(); p2pUnlistenFn = null; }
+  } catch (e) {
+    toast("停止失败: " + (e?.message || e), "error");
+  }
+}
+
+async function p2pPull() {
+  const addr = document.getElementById("p2pAddrInput")?.value.trim();
+  if (!addr) { toast("请输入对端地址", "error"); return; }
+  if (!syncState?.private_key_pem) { toast("请先配置私钥（用于解密）", "error"); return; }
+
+  syncLog("正在从 " + addr + " 拉取...", "info");
+  try {
+    const resp = await fetch("http://" + addr + "/sync");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const payloadText = await resp.text();
+
+    const remote = await invoke("sync_decrypt_payload", { payloadJson: payloadText });
+
+    pendingRemoteConfig = remote;
+    const providers = Object.keys(remote);
+    const totalKeys = providers.reduce((sum, p) => sum + (remote[p]?.keys?.length || 0), 0);
+    const body = document.getElementById("syncConfirmBody");
+    if (body) {
+      body.innerHTML = `
+        <p>从 ${addr} 获取到：</p>
+        <ul style="margin:8px 0;padding-left:20px;">
+          <li>${providers.length} 个厂商</li>
+          <li>${totalKeys} 个 API Key</li>
+        </ul>
+        <p style="margin-top:8px;font-size:13px;color:var(--txt-b);">选择同步方式：</p>
+      `;
+    }
+    document.getElementById("syncConfirmModal").style.display = "";
+    syncLog("拉取成功", "success");
+  } catch (e) {
+    const msg = e?.message || e;
+    toast("拉取失败: " + msg, "error");
+    syncLog("拉取失败: " + msg, "error");
+  }
+}
+
+async function p2pPush() {
+  const addr = document.getElementById("p2pAddrInput")?.value.trim();
+  if (!addr) { toast("请输入对端地址", "error"); return; }
+  if (!syncState?.public_key_pem) { toast("请先配置公钥（用于加密）", "error"); return; }
+
+  try {
+    const encryptedJson = await invoke("sync_encrypt_config");
+
+    syncLog("正在推送到 " + addr + "...", "info");
+    const resp = await fetch("http://" + addr + "/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: encryptedJson,
+    });
+
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    toast("推送成功");
+    syncLog("推送成功", "success");
+  } catch (e) {
+    const msg = e?.message || e;
+    toast("推送失败: " + msg, "error");
+    syncLog("推送失败: " + msg, "error");
+  }
+}
+
+async function p2pHandleReceived(encryptedJson) {
+  if (!syncState?.private_key_pem) {
+    syncLog("收到对端推送，但未配置私钥无法解密", "error");
+    return;
+  }
+  try {
+    const remote = await invoke("sync_decrypt_payload", { payloadJson: encryptedJson });
+
+    await invoke("sync_merge_config", { remote });
+    await loadConfig();
+    renderAllCards();
+
+    const providers = Object.keys(remote);
+    const totalKeys = providers.reduce((sum, p) => sum + (remote[p]?.keys?.length || 0), 0);
+    syncLog(`收到对端推送：${providers.length} 个厂商，${totalKeys} 个 Key（已自动合并）`, "success");
+    toast("收到对端推送，已合并");
+  } catch (e) {
+    syncLog("处理推送失败: " + (e?.message || e), "error");
+  }
+}
+
 function syncCopyText(targetId) {
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -994,6 +1118,12 @@ async function main() {
   document.getElementById("syncIntervalSelect")?.addEventListener("change", syncSetInterval);
   document.getElementById("syncPullBtn")?.addEventListener("click", () => syncPull(false));
   document.getElementById("syncExportBtn")?.addEventListener("click", syncExport);
+
+  // P2P 局域网同步事件
+  document.getElementById("p2pShareBtn")?.addEventListener("click", p2pStartShare);
+  document.getElementById("p2pStopBtn")?.addEventListener("click", p2pStop);
+  document.getElementById("p2pPullBtn")?.addEventListener("click", p2pPull);
+  document.getElementById("p2pPushBtn")?.addEventListener("click", p2pPush);
 
   document.getElementById("syncImportConfirmBtn")?.addEventListener("click", syncImportKey);
   document.getElementById("syncImportCancelBtn")?.addEventListener("click", () => {
