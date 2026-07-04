@@ -1091,44 +1091,62 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 
 @media (max-width: 480px) {
   :root {
-    --radius: 12px;
-    --radius-sm: 9px;
+    --radius: 10px;
+    --radius-sm: 8px;
+    --base-font: 12px;
   }
 
   body {
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    font-size: 12px;
   }
 
-  .app { padding: 0 16px; }
-  .main { padding: 20px 0 60px; }
+  .app { padding: 0 14px; }
+  .main { padding: 16px 0 48px; }
 
-  .topbar { margin-bottom: 24px; }
-  .topbar-title { gap: 10px; }
-  .logo-icon { width: 38px; height: 38px; border-radius: 12px; }
-  .topbar h1 { font-size: 22px; }
-  .topbar-desc { font-size: 13px; margin-top: 4px; }
-  .topbar-actions { margin-top: 16px; }
+  .topbar { margin-bottom: 18px; }
+  .topbar-title { gap: 8px; }
+  .logo-icon { width: 32px; height: 32px; border-radius: 10px; }
+  .topbar h1 { font-size: 18px; }
+  .topbar-desc { font-size: 11px; margin-top: 3px; }
+  .topbar-actions { margin-top: 12px; }
+
+  .theme-toggle {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
 
   .btn-add-provider {
     width: 100%;
     justify-content: center;
-    padding: 13px 24px;
-    font-size: 15px;
+    padding: 10px 20px;
+    font-size: 13px;
+    border-radius: 8px;
   }
 
-  .cards { gap: 16px; }
+  .cards { gap: 12px; }
 
-  .card-top { padding: 16px 18px; }
-  .card-form { padding: 18px; }
-  .avatar { width: 40px; height: 40px; font-size: 16px; border-radius: 12px; }
-  .card-name { font-size: 16px; }
+  .card-top { padding: 12px 14px; }
+  .card-form { padding: 14px; }
+  .avatar { width: 34px; height: 34px; font-size: 14px; border-radius: 10px; }
+  .card-name { font-size: 14px; }
+  .card-sub { font-size: 10px; margin-top: 1px; }
+  .badge { font-size: 9px; padding: 3px 8px; }
 
-  .form-group { margin-bottom: 14px; }
-  .input { height: 46px; font-size: 15px; }
-  .select { height: 46px; font-size: 15px; }
-  .btn-refresh { height: 46px; }
-  .icon-btn { width: 46px; height: 46px; }
+  .form-group { margin-bottom: 10px; }
+  .form-group label { font-size: 9px; margin-bottom: 5px; letter-spacing: 0.5px; }
+  .input { height: 36px; font-size: 13px; padding: 0 10px; }
+  .select { height: 36px; font-size: 13px; padding: 0 10px; padding-right: 28px; }
+  .btn-refresh { height: 36px; font-size: 12px; padding: 0 12px; }
+  .icon-btn { width: 36px; height: 36px; font-size: 13px; }
+
+  .url-chip {
+    font-size: 10px;
+    padding: 6px 10px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1140,11 +1158,11 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   .modal {
     width: 100%;
     max-width: 100%;
-    border-radius: 16px 16px 0 0;
+    border-radius: 14px 14px 0 0;
     border-bottom: none;
     border-left: none;
     border-right: none;
-    max-height: 92vh;
+    max-height: 85vh;
     overflow-y: auto;
     animation: modalSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -1157,35 +1175,35 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   .modal-sm, .modal-lg { width: 100%; }
 
   .modal-header {
-    padding: 20px 20px 0;
-    font-size: 17px;
+    padding: 16px 16px 0;
+    font-size: 15px;
   }
 
   .modal-body {
-    padding: 16px 20px;
-    font-size: 14px;
+    padding: 12px 16px;
+    font-size: 12px;
   }
 
   .modal-footer {
-    padding: 0 20px 24px;
+    padding: 0 16px 16px;
     flex-direction: column-reverse;
-    gap: 8px;
+    gap: 6px;
   }
 
   .modal-footer button {
     width: 100%;
-    height: 46px;
-    font-size: 15px;
+    height: 40px;
+    font-size: 13px;
   }
 
   .sync-section {
-    margin-bottom: 18px;
-    padding-bottom: 18px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
   }
 
-  .sync-section-title { font-size: 13px; margin-bottom: 10px; }
+  .sync-section-title { font-size: 11px; margin-bottom: 8px; }
 
-  .sync-row { gap: 8px; }
+  .sync-row { gap: 6px; }
 
   .sync-key-actions,
   .sync-manual-actions {
@@ -1194,26 +1212,26 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 
   .sync-url-input { width: 100%; }
 
-  .sync-hint { font-size: 12px; line-height: 1.5; }
+  .sync-hint { font-size: 11px; line-height: 1.5; }
 
   .sync-key-status {
-    padding: 12px 14px;
-    font-size: 14px;
+    padding: 10px 12px;
+    font-size: 12px;
   }
 
   .sync-key-actions button,
   .sync-manual-actions button {
-    flex: 1 1 calc(50% - 4px);
+    flex: 1 1 calc(50% - 3px);
     min-width: 0;
-    height: 44px;
-    font-size: 13px;
-    padding: 0 12px;
+    height: 38px;
+    font-size: 12px;
+    padding: 0 10px;
     white-space: nowrap;
   }
 
   .sync-key-actions,
   .sync-manual-actions {
-    gap: 8px;
+    gap: 6px;
   }
 
   .sync-interval-select {
@@ -1222,25 +1240,25 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   }
 
   .sync-footer-note {
-    font-size: 12px;
-    padding: 12px;
-    line-height: 1.6;
+    font-size: 11px;
+    padding: 10px;
+    line-height: 1.5;
   }
 
   .btn-save-key, .btn-cancel-key {
-    height: 44px;
-    padding: 0 16px;
-    font-size: 14px;
+    height: 38px;
+    padding: 0 14px;
+    font-size: 12px;
   }
 
   .sync-key-textarea {
-    font-size: 11px;
-    min-height: 80px;
+    font-size: 10px;
+    min-height: 70px;
   }
 
   .sync-log {
-    font-size: 11px;
-    max-height: 100px;
+    font-size: 10px;
+    max-height: 80px;
   }
 }
 

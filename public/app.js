@@ -1014,3 +1014,19 @@ async function main() {
   });
 }
 document.addEventListener("DOMContentLoaded", main);
+
+if (window.visualViewport) {
+  let lastHeight = window.visualViewport.height;
+  window.visualViewport.addEventListener("resize", () => {
+    const diff = lastHeight - window.visualViewport.height;
+    lastHeight = window.visualViewport.height;
+    if (diff > 100) {
+      const active = document.activeElement;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
+        setTimeout(() => {
+          active.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+      }
+    }
+  });
+}

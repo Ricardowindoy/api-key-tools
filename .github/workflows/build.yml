@@ -186,14 +186,39 @@ jobs:
           echo "NDK_HOME=${NDK_HOME}"
           cargo tauri android init --ci
 
+      - name: 生成自签 keystore 并配置签名
+        shell: bash
+        run: |
+          ANDROID_DIR="src-tauri/gen/android"
+          
+          # 生成临时 keystore
+          keytool -genkeypair -v \
+            -keystore "${ANDROID_DIR}/app/debug.keystore" \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug, O=Android, C=US"
 
-      - name: 构建 Android APK（debug，arm64 单架构）
+          # 写入 tauri.properties 配置签名（Tauri 原生支持）
+          PROPS_FILE="${ANDROID_DIR}/app/tauri.properties"
+          cat >> "${PROPS_FILE}" << 'PROPEOF'
+
+keystorePath=app/debug.keystore
+keystorePassword=android
+keystoreAlias=androiddebugkey
+keystoreAliasPassword=android
+PROPEOF
+          
+          echo "tauri.properties 签名配置已写入"
+          cat "${PROPS_FILE}"
+
+      - name: 构建 Android APK（release，自签名，arm64 单架构）
         shell: bash
         run: |
           export ANDROID_HOME="${ANDROID_SDK_ROOT}"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
           export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
-          cargo tauri android build --apk --debug --target aarch64 --ci
+          cargo tauri android build --apk --release --target aarch64 --ci
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
