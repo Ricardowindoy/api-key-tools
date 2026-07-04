@@ -61,13 +61,33 @@ jobs:
         run: cargo tauri icon build/icon.png
         continue-on-error: true
 
-      - name: 构建 Android APK（debug）
+      - name: 生成临时签名 keystore 并配置
+        run: |
+          ANDROID_DIR="src-tauri/gen/android"
+          keytool -genkeypair -v \
+            -keystore "${ANDROID_DIR}/app/debug.keystore" \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug, O=Android, C=US"
+          PROPS_FILE="${ANDROID_DIR}/app/tauri.properties"
+          cat >> "${PROPS_FILE}" << 'PROPEOF'
+
+          keystorePath=app/debug.keystore
+          keystorePassword=android
+          keystoreAlias=androiddebugkey
+          keystoreAliasPassword=android
+          PROPEOF
+          echo "=== tauri.properties 内容 ==="
+          cat "${PROPS_FILE}"
+
+      - name: 构建 Android APK（release，自签名）
         run: |
           export ANDROID_HOME="${ANDROID_SDK_ROOT}"
           export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
           echo "ANDROID_HOME=${ANDROID_HOME}"
           echo "NDK_HOME=${NDK_HOME}"
-          cargo tauri android build --apk --debug --target aarch64
+          cargo tauri android build --apk --release --target aarch64
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
