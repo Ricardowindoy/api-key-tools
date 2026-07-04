@@ -61,27 +61,7 @@ jobs:
         run: cargo tauri icon build/icon.png
         continue-on-error: true
 
-      - name: 生成临时签名 keystore 并配置
-        run: |
-          ANDROID_DIR="src-tauri/gen/android"
-          keytool -genkeypair -v \
-            -keystore "${ANDROID_DIR}/app/debug.keystore" \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug, O=Android, C=US"
-          PROPS_FILE="${ANDROID_DIR}/app/tauri.properties"
-          cat >> "${PROPS_FILE}" << 'PROPEOF'
-
-          keystorePath=app/debug.keystore
-          keystorePassword=android
-          keystoreAlias=androiddebugkey
-          keystoreAliasPassword=android
-          PROPEOF
-          echo "=== tauri.properties 内容 ==="
-          cat "${PROPS_FILE}"
-
-      - name: 构建 Android APK（release，自签名）
+      - name: 构建 Android APK（未签名 release）
         run: |
           export ANDROID_HOME="${ANDROID_SDK_ROOT}"
           export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
@@ -89,12 +69,68 @@ jobs:
           echo "NDK_HOME=${NDK_HOME}"
           cargo tauri android build --apk --target aarch64
 
+      - name: 查找并列出 APK
+        run: |
+          find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -ls 2>/dev/null || echo "no apk found yet"
+
+      - name: 生成签名 keystore 并签名 APK
+        run: |
+          ANDROID_DIR="src-tauri/gen/android"
+          APK_DIR="${ANDROID_DIR}/app/build/outputs/apk/release"
+          
+          # 生成 keystore
+          keytool -genkeypair -v \
+            -keystore "${ANDROID_DIR}/app/debug.keystore" \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug, O=Android, C=US"
+          
+          echo "=== 验证 keystore ==="
+          keytool -list -keystore "${ANDROID_DIR}/app/debug.keystore" -storepass android
+          
+          # 找到未签名的 APK
+          UNSIGNED_APK=$(find "${APK_DIR}" -name "*.apk" | head -1)
+          echo "找到 APK: ${UNSIGNED_APK}"
+          
+          if [ -z "${UNSIGNED_APK}" ]; then
+            # 尝试其他路径
+            UNSIGNED_APK=$(find src-tauri/gen/android -name "*.apk" | head -1)
+            echo "在其他路径找到 APK: ${UNSIGNED_APK}"
+          fi
+          
+          if [ -z "${UNSIGNED_APK}" ]; then
+            echo "ERROR: 未找到 APK 文件"
+            find src-tauri/gen/android -type f | head -50
+            exit 1
+          fi
+          
+          # 使用 apksigner 签名
+          SIGNED_APK="${APK_DIR}/app-release-signed.apk"
+          mkdir -p "${APK_DIR}"
+          
+          BUILD_TOOLS=$(ls -d ${ANDROID_SDK_ROOT}/build-tools/* | sort -V | tail -1)
+          echo "使用 build-tools: ${BUILD_TOOLS}"
+          
+          "${BUILD_TOOLS}/apksigner" sign \
+            --ks "${ANDROID_DIR}/app/debug.keystore" \
+            --ks-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --key-pass pass:android \
+            --out "${SIGNED_APK}" \
+            "${UNSIGNED_APK}"
+          
+          echo "=== 验证签名 ==="
+          "${BUILD_TOOLS}/apksigner" verify --verbose "${SIGNED_APK}"
+          
+          echo "签名后的 APK: ${SIGNED_APK}"
+
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
         with:
           name: api-key-manager-android
           path: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/release/app-release-signed.apk
           if-no-files-found: warn
 
       - name: 读取版本号
@@ -110,7 +146,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           files: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/release/app-release-signed.apk
           draft: false
           prerelease: true
         env:
