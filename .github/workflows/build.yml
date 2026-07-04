@@ -167,13 +167,16 @@ jobs:
       - name: 初始化 Android 工程
         run: cargo tauri android init
         env:
+          ANDROID_HOME: $ANDROID_SDK_ROOT
+          JAVA_HOME: $JAVA_HOME
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
 
       - name: 构建 Android APK（debug，无需签名）
         run: cargo tauri android build --apk --debug
         env:
+          ANDROID_HOME: $ANDROID_SDK_ROOT
+          JAVA_HOME: $JAVA_HOME
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
