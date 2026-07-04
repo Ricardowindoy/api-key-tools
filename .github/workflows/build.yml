@@ -141,11 +141,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 安装 Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: "platforms;android-34 build-tools;34.0.0 platform-tools"
-          accept-licenses: true
+      - name: 安装 Android SDK 组件
+        run: |
+          echo "SDK root: ${ANDROID_SDK_ROOT}"
+          # accept licenses
+          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/*/bin/sdkmanager --licenses 2>/dev/null || true
+          # install required packages
+          ${ANDROID_SDK_ROOT}/cmdline-tools/*/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: 安装 Android NDK
         uses: nttld/setup-ndk@v1
