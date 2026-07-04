@@ -107,9 +107,10 @@ fn reset_widget_position(app: tauri::AppHandle) -> Result<(), String> {
 
 // ===== 窗口控制 Commands =====
 
-const WIDGET_COLLAPSED: (u32, u32) = (60, 60);
-// 展开尺寸贴合 CSS 内容：宽度 380 留足选择器空间，高度 280
-const WIDGET_EXPANDED: (u32, u32) = (380, 280);
+// 收起态：UI 圆形 48×48，每边留 4px 给阴影/光环，避免大面积透明死区
+const WIDGET_COLLAPSED: (u32, u32) = (56, 56);
+// 展开态：贴合 CSS 实际内容（border 2 + header 39 + body 224 ≈ 265，留 5px 余量）
+const WIDGET_EXPANDED: (u32, u32) = (340, 270);
 
 /// 切换 widget 展开状态
 #[tauri::command]

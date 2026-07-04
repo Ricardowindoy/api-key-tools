@@ -27,8 +27,8 @@
       {
         "label": "widget",
         "title": "API Key Widget",
-        "width": 60,
-        "height": 60,
+        "width": 56,
+        "height": 56,
         "resizable": false,
         "decorations": false,
         "transparent": true,
