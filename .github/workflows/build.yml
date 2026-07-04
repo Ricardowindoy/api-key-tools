@@ -11,6 +11,7 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - platform: ubuntu-22.04
@@ -122,6 +123,7 @@ jobs:
 
   # ===== Android 构建 =====
   android:
+    needs: build
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -186,6 +188,13 @@ jobs:
           echo "NDK_HOME=${NDK_HOME}"
           cargo tauri android init --ci
 
+      - name: 生成 Android 图标资源
+        shell: bash
+        run: |
+          cargo tauri icon build/icon.png
+        # 如果生成失败不阻断构建（使用默认图标）
+        continue-on-error: true
+
       - name: 生成自签 keystore 并配置签名
         shell: bash
         run: |
@@ -247,65 +256,3 @@ PROPEOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ===== iOS 构建 =====
-  ios:
-    runs-on: macos-15
-    permissions:
-      contents: write
-
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
-
-      - name: 安装 Rust 工具链
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios
-
-      - name: 诊断 iOS 构建环境
-        run: |
-          echo "=== macOS 版本 ==="
-          sw_vers
-          echo "=== Xcode 版本 ==="
-          xcodebuild -version || true
-          echo "=== 可用 SDK ==="
-          xcodebuild -showsdks 2>&1 | head -20 || true
-          echo "=== iOS SDK 路径 ==="
-          xcrun --sdk iphoneos --show-sdk-path 2>&1 || true
-          echo "=== Rust 工具链 ==="
-          rustup show
-          echo "=== cargo 版本 ==="
-          cargo --version
-
-      - name: 缓存 Rust 编译产物（iOS）
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          shared-key: ios-aarch64-macos15
-
-      - name: 安装 cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-
-      - name: 安装 Tauri CLI
-        run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
-
-      - name: 编译 Rust（iOS 真机）
-        run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
-        continue-on-error: true
-
-      - name: 初始化 iOS 工程
-        run: cargo tauri ios init --ci
-        continue-on-error: true
-
-      - name: 构建 iOS（未签名）
-        run: cargo tauri ios build --no-sign --ci
-        continue-on-error: true
-
-      - name: 上传 iOS 产物
-        uses: actions/upload-artifact@v5
-        with:
-          name: api-key-manager-ios
-          path: |
-            src-tauri/gen/apple/build/**/*.app
-            src-tauri/gen/apple/build/**/*.ipa
-          if-no-files-found: warn
