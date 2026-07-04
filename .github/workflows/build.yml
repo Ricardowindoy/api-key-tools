@@ -50,19 +50,24 @@ jobs:
         run: cargo install tauri-cli --version "^2.0" --locked
 
       - name: 初始化 Android 工程
-        run: cargo tauri android init
-        env:
-          NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
+        run: |
+          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+          export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "NDK_HOME=${NDK_HOME}"
+          cargo tauri android init
 
       - name: 生成 Android 图标资源
         run: cargo tauri icon build/icon.png
         continue-on-error: true
 
       - name: 构建 Android APK（debug）
-        run: cargo tauri android build --apk --debug --target aarch64
-        env:
-          NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+          export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "NDK_HOME=${NDK_HOME}"
+          cargo tauri android build --apk --debug --target aarch64
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
