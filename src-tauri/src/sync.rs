@@ -67,8 +67,8 @@ pub fn generate_keypair() -> Result<KeyPair, String> {
         .map_err(|e| format!("导出公钥失败: {}", e))?;
 
     Ok(KeyPair {
-        private_pem,
-        public_pem,
+        private_pem: private_pem.to_string(),
+        public_pem: public_pem.to_string(),
     })
 }
 
@@ -91,6 +91,7 @@ pub fn public_from_private(private_pem: &str) -> Result<String, String> {
     let pub_key = RsaPublicKey::from(&priv_key);
     pub_key
         .to_pkcs1_pem(rsa::pkcs1::LineEnding::LF)
+        .map(|s| s.to_string())
         .map_err(|e| format!("导出公钥失败: {}", e))
 }
 
