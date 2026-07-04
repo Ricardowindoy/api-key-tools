@@ -173,18 +173,23 @@ jobs:
           ls -la ${{ steps.setup_ndk.outputs.ndk-path }}/source.properties 2>&1 || true
 
       - name: 初始化 Android 工程
-        run: cargo tauri android init
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
-          NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
+        shell: bash
+        run: |
+          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+          export JAVA_HOME="${JAVA_HOME_17_X64}"
+          export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          echo "NDK_HOME=${NDK_HOME}"
+          cargo tauri android init
 
       - name: 构建 Android APK（debug，无需签名）
-        run: cargo tauri android build --apk --debug
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
-          NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
+        shell: bash
+        run: |
+          export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+          export JAVA_HOME="${JAVA_HOME_17_X64}"
+          export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
+          cargo tauri android build --apk --debug
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
