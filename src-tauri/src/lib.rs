@@ -259,12 +259,17 @@ pub fn run() {
 
     log::info!("API Key Manager 启动中 (Tauri)");
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--widget"]),
-        ))
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init());
+
+    // 开机自启仅桌面端注册（移动端无此概念，且插件不支持 android/ios）
+    #[cfg(not(mobile))]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        Some(vec!["--widget"]),
+    ));
+
+    builder
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
