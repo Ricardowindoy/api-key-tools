@@ -120,9 +120,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ===== Android 构建（等桌面端跑完，避免并发超限）=====
+  # ===== Android 构建（与桌面端并发）=====
   android:
-    needs: build
     runs-on: ubuntu-22.04
     permissions:
       contents: write
