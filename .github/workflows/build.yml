@@ -184,7 +184,7 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME}"
           echo "JAVA_HOME=${JAVA_HOME}"
           echo "NDK_HOME=${NDK_HOME}"
-          cargo tauri android init
+          cargo tauri android init --ci
 
       - name: 限制 Android 架构为 arm64-v8a
         shell: bash
@@ -205,7 +205,7 @@ jobs:
           export ANDROID_HOME="${ANDROID_SDK_ROOT}"
           export JAVA_HOME="${JAVA_HOME_17_X64}"
           export NDK_HOME="${{ steps.setup_ndk.outputs.ndk-path }}"
-          cargo tauri android build --apk --debug
+          cargo tauri android build --apk --debug --ci
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v5
@@ -264,11 +264,11 @@ jobs:
         run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
 
       - name: 初始化 iOS 工程
-        run: cargo tauri ios init
+        run: cargo tauri ios init --ci
         continue-on-error: true
 
       - name: 构建 iOS（未签名）
-        run: cargo tauri ios build --no-sign
+        run: cargo tauri ios build --no-sign --ci
         continue-on-error: true
 
       - name: 上传 iOS 产物
