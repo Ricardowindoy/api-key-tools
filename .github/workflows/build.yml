@@ -260,8 +260,12 @@ jobs:
       - name: 安装 Tauri CLI
         run: cargo binstall tauri-cli --version "^2.0" --no-confirm --locked
 
+      - name: 编译 Rust（iOS 真机）
+        run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
+
       - name: 初始化 iOS 工程
         run: cargo tauri ios init
+        continue-on-error: true
 
       - name: 构建 iOS（未签名）
         run: cargo tauri ios build --no-sign
