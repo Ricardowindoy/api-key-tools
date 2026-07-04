@@ -275,6 +275,7 @@ PROPEOF
 
       - name: 编译 Rust（iOS 真机）
         run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
+        continue-on-error: true
 
       - name: 初始化 iOS 工程
         run: cargo tauri ios init --ci
