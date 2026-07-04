@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "桌面端专属权限 - widget 窗口与自启动",
+  "platforms": ["linux", "windows", "macOS"],
+  "windows": ["main", "widget"],
+  "permissions": [
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-skip-taskbar",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
+  ]
+}
