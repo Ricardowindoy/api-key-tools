@@ -17,7 +17,7 @@ jobs:
             target: linux
           - platform: windows-latest
             target: windows
-          - platform: macos-latest
+          - platform: macos-15
             target: macos
     runs-on: ${{ matrix.platform }}
     permissions:
@@ -249,7 +249,7 @@ PROPEOF
 
   # ===== iOS 构建 =====
   ios:
-    runs-on: macos-latest
+    runs-on: macos-15
     permissions:
       contents: write
 
@@ -262,10 +262,26 @@ PROPEOF
         with:
           targets: aarch64-apple-ios
 
-      - name: 缓存 Rust 编译产物
+      - name: 诊断 iOS 构建环境
+        run: |
+          echo "=== macOS 版本 ==="
+          sw_vers
+          echo "=== Xcode 版本 ==="
+          xcodebuild -version || true
+          echo "=== 可用 SDK ==="
+          xcodebuild -showsdks 2>&1 | head -20 || true
+          echo "=== iOS SDK 路径 ==="
+          xcrun --sdk iphoneos --show-sdk-path 2>&1 || true
+          echo "=== Rust 工具链 ==="
+          rustup show
+          echo "=== cargo 版本 ==="
+          cargo --version
+
+      - name: 缓存 Rust 编译产物（iOS）
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: ios-aarch64-macos15
 
       - name: 安装 cargo-binstall
         uses: cargo-bins/cargo-binstall@main
