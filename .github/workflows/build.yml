@@ -8,121 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        include:
-          - platform: ubuntu-22.04
-            target: linux
-          - platform: windows-latest
-            target: windows
-          - platform: macos-15
-            target: macos
-    runs-on: ${{ matrix.platform }}
-    permissions:
-      contents: write
-
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
-
-      - name: 设置 Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: 安装 Rust 工具链
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: 缓存 Rust 编译产物
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: 安装 Linux 系统依赖
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
-
-      - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2.0" --locked
-
-      - name: 生成 Windows ICO 图标
-        if: matrix.target == 'windows'
-        shell: pwsh
-        run: |
-          choco install imagemagick -y --no-progress
-          magick convert build/icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
-          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
-          $conf.bundle.icon = @("../build/icon.ico")
-          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
-
-      - name: 构建应用
-        run: cargo tauri build
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v5
-        with:
-          name: api-key-manager-${{ matrix.target }}
-          path: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.app
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.rpm
-          if-no-files-found: warn
-
-      - name: 读取版本号
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        id: version
-        shell: bash
-        run: |
-          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-
-      - name: 发布到 GitHub Release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.version }}
-          body: |
-            ## API Key Manager ${{ steps.version.outputs.version }}
-
-            自动构建产物（Tauri 重构版），由 GitHub Actions 推送发布。
-
-            ### 下载
-            - Windows: `.exe` / `.msi` 安装包
-            - macOS: `.dmg` 安装包
-            - Linux: `.deb` / `.AppImage`
-
-            ### 来源
-            - 分支: ${{ github.ref_name }}
-            - 平台: ${{ matrix.target }}
-            - 提交: ${{ github.sha }}
-          files: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ===== Android 构建（等桌面端跑完，避免并发超限）=====
   android:
-    needs: build
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -168,11 +54,11 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
 
-      - name: 生成 Android 图标资源（替换默认 Tauri 图标）
+      - name: 生成 Android 图标资源
         run: cargo tauri icon build/icon.png
         continue-on-error: true
 
-      - name: 构建 Android APK（debug，无需签名证书）
+      - name: 构建 Android APK（debug）
         run: cargo tauri android build --apk --debug --target aarch64
         env:
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
@@ -186,7 +72,7 @@ jobs:
             src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
 
-      - name: 读取版本号（Android）
+      - name: 读取版本号
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
         shell: bash
         run: |
