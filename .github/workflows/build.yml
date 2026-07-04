@@ -234,7 +234,7 @@ jobs:
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+          targets: aarch64-apple-ios
 
       - name: 缓存 Rust 编译产物
         uses: swatinem/rust-cache@v2
@@ -250,11 +250,6 @@ jobs:
       - name: 初始化 iOS 工程
         run: cargo tauri ios init
 
-      # 第一步：直接用 cargo 编译 iOS Rust 代码，确保移动端可编译（不依赖 Xcode 签名）
-      - name: 编译 Rust（aarch64-apple-ios）
-        run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
-
-      # 第二步：尝试完整 Xcode 构建（无签名），失败不阻断流程
       - name: 构建 iOS（未签名）
         run: cargo tauri ios build --no-sign
         continue-on-error: true
