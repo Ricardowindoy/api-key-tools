@@ -3,12 +3,21 @@
 
 mod config;
 mod models;
+mod p2p;
 mod state;
 mod sync;
 
 use config::{Config, WidgetProviderInfo};
 use models::ModelInfo;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
+
+static P2P_SERVER: std::sync::OnceLock<Mutex<Option<p2p::P2PServer>>> =
+    std::sync::OnceLock::new();
+
+fn p2p_server() -> &'static Mutex<Option<p2p::P2PServer>> {
+    P2P_SERVER.get_or_init(|| Mutex::new(None))
+}
 
 // ===== 配置相关 Commands =====
 
@@ -254,6 +263,101 @@ fn sync_overwrite_config(app: tauri::AppHandle, remote: Config) -> Result<(), St
     config::save_config(&app, &remote)
 }
 
+// ===== P2P 局域网同步 Commands =====
+
+/// 启动 P2P 分享服务
+#[tauri::command]
+fn p2p_start_server(app: tauri::AppHandle) -> Result<(String, String), String> {
+    let ip = p2p::get_local_ip()?;
+    let port = p2p::find_available_port()?;
+
+    let cfg = config::load_config(&app);
+    let ss = state::load_sync_state(&app);
+    let pub_key = ss.public_key_pem.ok_or("请先生成或导入密钥对")?;
+    let payload = sync::encrypt_config_to_string(&pub_key, &cfg)?;
+
+    let addr = format!("{}:{}", ip, port);
+    let server = p2p::P2PServer::start(
+        &ip,
+        port,
+        Some(payload),
+        {
+            let app = app.clone();
+            move |body| {
+                log::info!("P2P 收到新的加密配置");
+                // 暂存到全局状态，由前端决定同步方式
+            }
+        },
+    )?;
+
+    let qrcode_svg = p2p::generate_qrcode_svg(&format!("http://{}/sync", addr))?;
+
+    {
+        let mut guard = p2p_server().lock().unwrap();
+        *guard = Some(server);
+    }
+
+    Ok((addr, qrcode_svg))
+}
+
+/// 停止 P2P 分享服务
+#[tauri::command]
+fn p2p_stop_server() -> Result<(), String> {
+    let mut guard = p2p_server().lock().unwrap();
+    if let Some(server) = guard.take() {
+        server.stop();
+        // 等线程退出
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        Ok(())
+    } else {
+        Err("没有运行中的分享服务".into())
+    }
+}
+
+/// 获取 P2P 服务状态
+#[tauri::command]
+fn p2p_get_status() -> Result<(bool, Option<String>), String> {
+    let guard = p2p_server().lock().unwrap();
+    match guard.as_ref() {
+        Some(server) => {
+            let running = server.is_running();
+            let addr = if running {
+                Some(server.addr.clone())
+            } else {
+                None
+            };
+            Ok((running, addr))
+        }
+        None => Ok((false, None)),
+    }
+}
+
+/// 刷新分享的加密 payload（推送最新本地配置）
+#[tauri::command]
+fn p2p_refresh_payload(app: tauri::AppHandle) -> Result<(), String> {
+    let guard = p2p_server().lock().unwrap();
+    if let Some(server) = guard.as_ref() {
+        let ss = state::load_sync_state(&app);
+        let pub_key = ss.public_key_pem.ok_or("未配置公钥")?;
+        let cfg = config::load_config(&app);
+        let payload = sync::encrypt_config_to_string(&pub_key, &cfg)?;
+        server.set_payload(payload);
+        Ok(())
+    } else {
+        Err("没有运行中的分享服务".into())
+    }
+}
+
+/// 解密从 P2P 对端获取的加密 payload JSON
+#[tauri::command]
+fn p2p_decrypt_payload(app: tauri::AppHandle, payload_json: String) -> Result<Config, String> {
+    let ss = state::load_sync_state(&app);
+    let priv_key = ss.private_key_pem.ok_or("未配置私钥，无法解密")?;
+    let payload: sync::EncryptedPayload =
+        serde_json::from_str(&payload_json).map_err(|e| format!("解析 payload 失败: {}", e))?;
+    sync::decrypt_config(&priv_key, &payload)
+}
+
 // ===== 窗口控制 Commands =====
 
 // 收起态：UI 圆形 48×48，每边留 4px 给阴影/光环，避免大面积透明死区
@@ -441,6 +545,11 @@ pub fn run() {
             sync_fetch_remote,
             sync_merge_config,
             sync_overwrite_config,
+            p2p_start_server,
+            p2p_stop_server,
+            p2p_get_status,
+            p2p_refresh_payload,
+            p2p_decrypt_payload,
             widget_set_expanded,
             widget_snap_to_edge,
             widget_show,
