@@ -127,6 +127,17 @@ function renderAllCards() {
   const container = document.getElementById("cardsContainer");
   container.innerHTML = "";
   const providers = Object.keys(state).sort();
+  if (providers.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = `
+      <div class="empty-state-icon">🔑</div>
+      <div class="empty-state-title">还没有 API Key</div>
+      <div class="empty-state-desc">点击下方「添加厂商」按钮，开始管理你的第一个 API Key</div>
+    `;
+    container.appendChild(empty);
+    return;
+  }
   providers.forEach((p) => { renderCard(p); });
 }
 
@@ -303,8 +314,7 @@ async function addProvider(name, baseUrl) {
   if (!name || !baseUrl) { toast("请填写厂商名称和 Base URL", "error"); return; }
   if (state[name]) { toast("厂商 \"" + name + "\" 已存在", "error"); return; }
   state[name] = { baseUrl, keys: [], models: [], selectedModel: "" };
-  renderCard(name);
-  updateCardSub(name);
+  renderAllCards();
   await saveConfig();
   toast("厂商 \"" + name + "\" 已添加");
 }
@@ -312,7 +322,7 @@ async function addProvider(name, baseUrl) {
 async function deleteProvider(provider) {
   if (!state[provider]) return;
   delete state[provider];
-  removeProviderCard(provider);
+  renderAllCards();
   await saveConfig();
   toast("厂商已删除");
 }

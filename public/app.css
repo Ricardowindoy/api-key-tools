@@ -767,6 +767,50 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   text-align: center;
 }
 
+/* ===== Empty State ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  width: 140px;
+  height: 140px;
+  font-size: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-radius: 28px;
+  margin-bottom: 28px;
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.35),
+              0 0 0 1px rgba(124, 58, 237, 0.15) inset;
+  animation: emptyFloat 3s ease-in-out infinite;
+}
+
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+.empty-state-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--txt-a);
+  margin-bottom: 12px;
+}
+
+.empty-state-desc {
+  font-size: 15px;
+  color: var(--txt-c);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
 /* ===== Modal ===== */
 .modal-overlay {
   position: fixed;
