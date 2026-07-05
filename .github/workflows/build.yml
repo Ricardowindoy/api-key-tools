@@ -166,16 +166,40 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
 
-      - name: 注入 Android 相机权限
+      - name: 注入 Android 相机权限和 feature
         run: |
           MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
-            # 在 <manifest> 内部插入 CAMERA 权限
-            sed -i '/<uses-permission android:name="android.permission.INTERNET"\/>/a\    <uses-permission android:name="android.permission.CAMERA" />' "$MANIFEST"
-            echo "=== 已注入 CAMERA 权限 ==="
-            grep -n "CAMERA\|INTERNET" "$MANIFEST"
+            echo "=== 注入 CAMERA 权限 ==="
+            # 修复：使用 [[:space:]]* 匹配 INTERNET"/> 和 INTERNET" /> 两种格式
+            sed -i '/<uses-permission android:name="android.permission.INTERNET"[[:space:]]*\/>/a\    <uses-permission android:name="android.permission.CAMERA" />' "$MANIFEST"
+            sed -i '/<uses-permission android:name="android.permission.CAMERA"[[:space:]]*\/>/a\    <uses-feature android:name="android.hardware.camera" android:required="false" />' "$MANIFEST"
+            echo "=== 注入后 Manifest ==="
+            grep -n "INTERNET\|CAMERA\|camera" "$MANIFEST"
+            # 验证 CAMERA 权限已注入
+            if ! grep -q "CAMERA" "$MANIFEST"; then
+              echo "ERROR: CAMERA 权限注入失败"
+              exit 1
+            fi
           else
-            echo "WARNING: AndroidManifest.xml not found at $MANIFEST"
+            echo "ERROR: AndroidManifest.xml not found at $MANIFEST"
+            exit 1
+          fi
+
+      - name: 添加 ProGuard 规则保护 WebView 摄像头权限回调
+        run: |
+          PROGUARD="src-tauri/gen/android/app/proguard-rules.pro"
+          if [ -f "$PROGUARD" ]; then
+            echo "" >> "$PROGUARD"
+            echo "# 保持 RustWebChromeClient 方法不被 R8 移除" >> "$PROGUARD"
+            echo "# 用于 WebView 摄像头权限请求回调 (onPermissionRequest)" >> "$PROGUARD"
+            echo "-keep class com.apikeymanager.app.generated.RustWebChromeClient {" >> "$PROGUARD"
+            echo "  public <methods>;" >> "$PROGUARD"
+            echo "}" >> "$PROGUARD"
+            echo "=== 已添加 ProGuard 规则 ==="
+            grep -A5 "RustWebChromeClient" "$PROGUARD"
+          else
+            echo "ERROR: proguard-rules.pro not found at $PROGUARD"
             exit 1
           fi
 
