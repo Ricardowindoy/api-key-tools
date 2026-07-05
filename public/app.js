@@ -128,6 +128,21 @@ function renderAllCards() {
   const container = document.getElementById("cardsContainer");
   container.innerHTML = "";
   const providers = Object.keys(state).sort();
+  
+  if (providers.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🔑</div>
+        <div class="empty-state-title">还没有 API Key</div>
+        <div class="empty-state-desc">点击下方「添加厂商」按钮，开始管理你的第一个 API Key</div>
+        <button class="empty-state-btn" id="emptyAddBtn">+ 添加厂商</button>
+      </div>
+    `;
+    const emptyBtn = document.getElementById("emptyAddBtn");
+    if (emptyBtn) emptyBtn.addEventListener("click", openProviderModal);
+    return;
+  }
+  
   providers.forEach((p) => { renderCard(p); });
 }
 
@@ -1045,6 +1060,7 @@ async function main() {
 
   const addBtn = document.getElementById("addProviderBtn");
   const fabAddBtn = document.getElementById("fabAddBtn");
+  const bottomAddBtn = document.getElementById("bottomAddBtn");
   const openProviderModal = () => {
     const modal = document.getElementById("providerModal");
     if (modal) modal.style.display = "";
@@ -1056,6 +1072,7 @@ async function main() {
   };
   if (addBtn) addBtn.addEventListener("click", openProviderModal);
   if (fabAddBtn) fabAddBtn.addEventListener("click", openProviderModal);
+  if (bottomAddBtn) bottomAddBtn.addEventListener("click", openProviderModal);
 
   const providerNameInput = document.getElementById("newProviderName");
   const providerUrlInput = document.getElementById("newProviderUrl");
@@ -1100,12 +1117,14 @@ async function main() {
   // ===== 同步 UI 事件绑定 =====
   const syncBtn = document.getElementById("syncBtn");
   const mobileSyncBtn = document.getElementById("mobileSyncBtn");
+  const bottomSyncBtn = document.getElementById("bottomSyncBtn");
   const openSyncModal = () => {
     const modal = document.getElementById("syncModal");
     if (modal) modal.style.display = "";
   };
   if (syncBtn) syncBtn.addEventListener("click", openSyncModal);
   if (mobileSyncBtn) mobileSyncBtn.addEventListener("click", openSyncModal);
+  if (bottomSyncBtn) bottomSyncBtn.addEventListener("click", openSyncModal);
 
   document.getElementById("syncCloseBtn")?.addEventListener("click", () => {
     document.getElementById("syncModal").style.display = "none";
