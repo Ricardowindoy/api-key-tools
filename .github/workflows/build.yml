@@ -209,55 +209,80 @@ jobs:
         run: |
           find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -ls 2>/dev/null || echo "no apk found yet"
 
-      - name: 生成签名 keystore 并签名 APK
+      - name: 解码 release keystore 并签名 APK
+        env:
+          # 首次使用前需要在 GitHub Secrets 中配置 ANDROID_KEYSTORE_BASE64
+          # 生成方式: base64 -w0 release.keystore > keystore_b64.txt
+          # 然后作为 Secret 添加到仓库
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           ANDROID_DIR="src-tauri/gen/android"
           APK_DIR="${ANDROID_DIR}/app/build/outputs/apk/release"
-          
-          # 生成 keystore
-          keytool -genkeypair -v \
-            -keystore "${ANDROID_DIR}/app/debug.keystore" \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug, O=Android, C=US"
-          
-          echo "=== 验证 keystore ==="
-          keytool -list -keystore "${ANDROID_DIR}/app/debug.keystore" -storepass android
-          
+          KEYSTORE_FILE="${ANDROID_DIR}/app/release.keystore"
+
+          # 如果配置了 Secrets，使用固定 keystore；否则生成临时 keystore（仅用于测试）
+          if [ -n "${ANDROID_KEYSTORE_BASE64}" ]; then
+            echo "使用固定 release keystore（来自 GitHub Secrets）"
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "${KEYSTORE_FILE}"
+            KS_PASS="${ANDROID_KEYSTORE_PASSWORD}"
+            KS_ALIAS="${ANDROID_KEY_ALIAS}"
+            KEY_PASS="${ANDROID_KEY_PASSWORD}"
+          else
+            echo "⚠ 未配置 ANDROID_KEYSTORE_BASE64 Secret，使用临时 keystore"
+            echo "⚠ 警告：临时 keystore 签名的 APK 无法做证书固定！"
+            keytool -genkeypair -v \
+              -keystore "${KEYSTORE_FILE}" \
+              -alias release \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass release123 -keypass release123 \
+              -dname "CN=API Key Manager, O=Release, C=US"
+            KS_PASS="release123"
+            KS_ALIAS="release"
+            KEY_PASS="release123"
+          fi
+
+          echo "=== 提取证书 SHA-256 指纹 ==="
+          keytool -list -v -keystore "${KEYSTORE_FILE}" -storepass "${KS_PASS}" -alias "${KS_ALIAS}" | grep -i "SHA256:" | head -1
+
           # 找到未签名的 APK
           UNSIGNED_APK=$(find "${APK_DIR}" -name "*.apk" | head -1)
           echo "找到 APK: ${UNSIGNED_APK}"
-          
+
           if [ -z "${UNSIGNED_APK}" ]; then
             UNSIGNED_APK=$(find src-tauri/gen/android -name "*.apk" | head -1)
             echo "在其他路径找到 APK: ${UNSIGNED_APK}"
           fi
-          
+
           if [ -z "${UNSIGNED_APK}" ]; then
             echo "ERROR: 未找到 APK 文件"
             find src-tauri/gen/android -type f | head -50
             exit 1
           fi
-          
-          # 使用 apksigner 签名
+
+          # 使用 apksigner 签名（v2 签名，确保证书固定可校验）
           SIGNED_APK="${APK_DIR}/app-release-signed.apk"
           mkdir -p "${APK_DIR}"
-          
+
           BUILD_TOOLS=$(ls -d ${ANDROID_SDK_ROOT}/build-tools/* | sort -V | tail -1)
           echo "使用 build-tools: ${BUILD_TOOLS}"
-          
+
           "${BUILD_TOOLS}/apksigner" sign \
-            --ks "${ANDROID_DIR}/app/debug.keystore" \
-            --ks-pass pass:android \
-            --ks-key-alias androiddebugkey \
-            --key-pass pass:android \
+            --ks "${KEYSTORE_FILE}" \
+            --ks-pass "pass:${KS_PASS}" \
+            --ks-key-alias "${KS_ALIAS}" \
+            --key-pass "pass:${KEY_PASS}" \
             --out "${SIGNED_APK}" \
             "${UNSIGNED_APK}"
-          
+
           echo "=== 验证签名 ==="
           "${BUILD_TOOLS}/apksigner" verify --verbose "${SIGNED_APK}"
-          
+
+          echo "=== 提取签名证书 SHA-256（用于证书固定）==="
+          "${BUILD_TOOLS}/apksigner" verify --print-certs "${SIGNED_APK}" 2>&1 | grep -i "SHA-256" | head -1
+
           echo "签名后的 APK: ${SIGNED_APK}"
 
       - name: 重命名 APK（统一命名风格）

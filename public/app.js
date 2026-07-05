@@ -1059,12 +1059,17 @@ function syncCopyText(targetId) {
 let deletePendingProvider = null;
 
 async function main() {
+  // ===== 先绑定所有按钮事件（不依赖任何 async 操作）=====
+  bindAllEvents();
+
   await loadConfig();
   renderAllCards();
   await applySavedTheme();
   await syncLoadState();
   syncSetupAutoTimer();
+}
 
+function bindAllEvents() {
   const themeBtn = document.getElementById("themeToggle");
   if (themeBtn) {
     themeBtn.addEventListener("click", async () => {
