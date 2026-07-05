@@ -2,7 +2,6 @@
 // Tauri 重构版：所有后端调用通过 invoke，不再依赖 HTTP 服务器
 const nav = window.__TAURI__;
 const core = nav?.core;
-const tauriEvent = nav?.event;
 const invoke = core?.invoke ? core.invoke.bind(core) : (...args) => Promise.reject("Tauri invoke not available");
 console.log("__TAURI__ IPC:", !!core?.invoke);
 
@@ -123,39 +122,22 @@ function normalizeModels(raw) {
     .filter((m) => m.id);
 }
 
-// ===== 模态框控制（全局）=====
-function openProviderModal() {
-  const modal = document.getElementById("providerModal");
-  if (modal) modal.style.display = "";
-  const input = document.getElementById("newProviderName");
-  if (input) input.value = "";
-  const urlInput = document.getElementById("newProviderUrl");
-  if (urlInput) urlInput.value = "";
-  if (input) input.focus();
-}
-
-function openSyncModal() {
-  const modal = document.getElementById("syncModal");
-  if (modal) modal.style.display = "";
-}
-
 // ===== 动态卡片渲染 =====
 function renderAllCards() {
   const container = document.getElementById("cardsContainer");
   container.innerHTML = "";
   const providers = Object.keys(state).sort();
-  
   if (providers.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">🔑</div>
-        <div class="empty-state-title">还没有 API Key</div>
-        <div class="empty-state-desc">点击下方「添加厂商」按钮，开始管理你的第一个 API Key</div>
-      </div>
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = `
+      <div class="empty-state-icon">🔑</div>
+      <div class="empty-state-title">还没有 API Key</div>
+      <div class="empty-state-desc">点击下方「添加厂商」按钮，开始管理你的第一个 API Key</div>
     `;
+    container.appendChild(empty);
     return;
   }
-  
   providers.forEach((p) => { renderCard(p); });
 }
 
@@ -166,6 +148,8 @@ function renderCard(provider) {
   const card = document.createElement("section");
   card.className = "card";
   card.dataset.provider = provider;
+
+  const keyCount = state[provider].keys.length;
 
   card.innerHTML = `
     <div class="card-top">
@@ -183,10 +167,20 @@ function renderCard(provider) {
     </div>
 
     <div class="card-form">
-      <div class="key-manage">
-        <div class="key-manage-header">
-          <label>已保存的 Key</label>
+      <div class="key-manage collapsed" id="keymanage-${provider}">
+        <div class="key-manage-header" id="keyheader-${provider}">
+          <div style="display:flex;align-items:center;">
+            <span class="toggle-arrow">▼</span>
+            <label>已保存的 Key</label>
+            <span class="key-count-badge">${keyCount}</span>
+          </div>
           <button class="btn-add-key" data-provider="${provider}">+ 添加</button>
+        </div>
+        <div class="key-selected-preview" id="keypreview-${provider}">
+          <div class="key-preview-left">
+            <div class="key-preview-name" id="keypreview-name-${provider}">暂无 Key</div>
+            <div class="key-preview-key" id="keypreview-key-${provider}"></div>
+          </div>
         </div>
         <div class="key-list" id="keylist-${provider}"></div>
         <div class="key-add-form" id="keyform-${provider}" style="display:none;">
@@ -255,6 +249,24 @@ function renderKeyList(provider) {
   if (!data) return;
   const keys = data.keys;
   const selectedId = keys.find((k) => k.selected)?.id || "";
+
+  // 更新计数徽章
+  const badge = document.querySelector(`#keymanage-${provider} .key-count-badge`);
+  if (badge) badge.textContent = keys.length;
+
+  // 更新收起状态的预览
+  const previewName = document.getElementById(`keypreview-name-${provider}`);
+  const previewKey = document.getElementById(`keypreview-key-${provider}`);
+  const selectedKey = keys.find((k) => k.selected) || keys[0];
+  if (previewName && previewKey) {
+    if (selectedKey) {
+      previewName.textContent = selectedKey.name || "未命名";
+      previewKey.textContent = maskKey(selectedKey.key);
+    } else {
+      previewName.textContent = "暂无 Key";
+      previewKey.textContent = "";
+    }
+  }
 
   el.innerHTML = "";
   if (keys.length === 0) {
@@ -332,8 +344,7 @@ async function addProvider(name, baseUrl) {
   if (!name || !baseUrl) { toast("请填写厂商名称和 Base URL", "error"); return; }
   if (state[name]) { toast("厂商 \"" + name + "\" 已存在", "error"); return; }
   state[name] = { baseUrl, keys: [], models: [], selectedModel: "" };
-  renderCard(name);
-  updateCardSub(name);
+  renderAllCards();
   await saveConfig();
   toast("厂商 \"" + name + "\" 已添加");
 }
@@ -341,7 +352,7 @@ async function addProvider(name, baseUrl) {
 async function deleteProvider(provider) {
   if (!state[provider]) return;
   delete state[provider];
-  removeProviderCard(provider);
+  renderAllCards();
   await saveConfig();
   toast("厂商已删除");
 }
@@ -519,12 +530,31 @@ function initCard(provider) {
   const select = document.getElementById(`select-${provider}`);
   const deleteBtn = document.querySelector(`.btn-delete-provider[data-provider="${provider}"]`);
   const urlText = document.getElementById(`urltext-${provider}`);
+  const keyHeader = document.getElementById(`keyheader-${provider}`);
+  const keyManage = document.getElementById(`keymanage-${provider}`);
 
   renderKeyList(provider);
 
+  // Key 列表展开/收起
+  if (keyHeader && keyManage) {
+    keyHeader.addEventListener("click", (e) => {
+      if (e.target.closest(".btn-add-key")) return;
+      keyManage.classList.toggle("collapsed");
+    });
+  }
+
   if (addBtn) {
-    addBtn.addEventListener("click", () => {
-      if (formEl) formEl.style.display = formEl.style.display === "none" ? "" : "none";
+    addBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (formEl) {
+        const isHidden = formEl.style.display === "none" || formEl.style.display === "";
+        if (isHidden) {
+          keyManage.classList.remove("collapsed");
+          formEl.style.display = "flex";
+        } else {
+          formEl.style.display = "none";
+        }
+      }
     });
   }
   if (cancelBtn) {
@@ -625,7 +655,6 @@ let syncState = null;
 let autoSyncTimer = null;
 let pendingRemoteConfig = null;
 let syncImportMode = "private"; // "private" | "public"
-let p2pUnlistenFn = null;
 
 async function syncLoadState() {
   try {
@@ -920,129 +949,6 @@ async function syncExport() {
   }
 }
 
-// ===== P2P 局域网同步 =====
-async function p2pStartShare() {
-  if (!syncState?.public_key_pem) {
-    toast("请先配置公钥（用于加密分享内容）", "error");
-    return;
-  }
-  try {
-    const [addr, qrcodeSvg] = await invoke("p2p_start_server");
-    document.getElementById("p2pQrCode").innerHTML = qrcodeSvg;
-    document.getElementById("p2pAddr").textContent = addr;
-    document.getElementById("p2pShareArea").style.display = "";
-    document.getElementById("p2pConnectArea").style.display = "none";
-    toast("分享已启动");
-    syncLog("P2P 分享已启动：" + addr, "info");
-
-    try {
-      const unlisten = await tauriEvent.listen("p2p-data-received", (event) => {
-        p2pHandleReceived(event.payload);
-      });
-      p2pUnlistenFn = unlisten;
-    } catch (e) {
-      console.warn("listen p2p-data-received failed:", e);
-    }
-  } catch (e) {
-    toast("启动失败: " + (e?.message || e), "error");
-  }
-}
-
-async function p2pStop() {
-  try {
-    await invoke("p2p_stop_server");
-    document.getElementById("p2pShareArea").style.display = "none";
-    document.getElementById("p2pConnectArea").style.display = "";
-    toast("已停止分享");
-    syncLog("P2P 分享已停止", "info");
-    if (p2pUnlistenFn) { p2pUnlistenFn(); p2pUnlistenFn = null; }
-  } catch (e) {
-    toast("停止失败: " + (e?.message || e), "error");
-  }
-}
-
-async function p2pPull() {
-  const addr = document.getElementById("p2pAddrInput")?.value.trim();
-  if (!addr) { toast("请输入对端地址", "error"); return; }
-  if (!syncState?.private_key_pem) { toast("请先配置私钥（用于解密）", "error"); return; }
-
-  syncLog("正在从 " + addr + " 拉取...", "info");
-  try {
-    const resp = await fetch("http://" + addr + "/sync");
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const payloadText = await resp.text();
-
-    const remote = await invoke("sync_decrypt_payload", { payloadJson: payloadText });
-
-    pendingRemoteConfig = remote;
-    const providers = Object.keys(remote);
-    const totalKeys = providers.reduce((sum, p) => sum + (remote[p]?.keys?.length || 0), 0);
-    const body = document.getElementById("syncConfirmBody");
-    if (body) {
-      body.innerHTML = `
-        <p>从 ${addr} 获取到：</p>
-        <ul style="margin:8px 0;padding-left:20px;">
-          <li>${providers.length} 个厂商</li>
-          <li>${totalKeys} 个 API Key</li>
-        </ul>
-        <p style="margin-top:8px;font-size:13px;color:var(--txt-b);">选择同步方式：</p>
-      `;
-    }
-    document.getElementById("syncConfirmModal").style.display = "";
-    syncLog("拉取成功", "success");
-  } catch (e) {
-    const msg = e?.message || e;
-    toast("拉取失败: " + msg, "error");
-    syncLog("拉取失败: " + msg, "error");
-  }
-}
-
-async function p2pPush() {
-  const addr = document.getElementById("p2pAddrInput")?.value.trim();
-  if (!addr) { toast("请输入对端地址", "error"); return; }
-  if (!syncState?.public_key_pem) { toast("请先配置公钥（用于加密）", "error"); return; }
-
-  try {
-    const encryptedJson = await invoke("sync_encrypt_config");
-
-    syncLog("正在推送到 " + addr + "...", "info");
-    const resp = await fetch("http://" + addr + "/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: encryptedJson,
-    });
-
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    toast("推送成功");
-    syncLog("推送成功", "success");
-  } catch (e) {
-    const msg = e?.message || e;
-    toast("推送失败: " + msg, "error");
-    syncLog("推送失败: " + msg, "error");
-  }
-}
-
-async function p2pHandleReceived(encryptedJson) {
-  if (!syncState?.private_key_pem) {
-    syncLog("收到对端推送，但未配置私钥无法解密", "error");
-    return;
-  }
-  try {
-    const remote = await invoke("sync_decrypt_payload", { payloadJson: encryptedJson });
-
-    await invoke("sync_merge_config", { remote });
-    await loadConfig();
-    renderAllCards();
-
-    const providers = Object.keys(remote);
-    const totalKeys = providers.reduce((sum, p) => sum + (remote[p]?.keys?.length || 0), 0);
-    syncLog(`收到对端推送：${providers.length} 个厂商，${totalKeys} 个 Key（已自动合并）`, "success");
-    toast("收到对端推送，已合并");
-  } catch (e) {
-    syncLog("处理推送失败: " + (e?.message || e), "error");
-  }
-}
-
 function syncCopyText(targetId) {
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -1056,17 +962,12 @@ function syncCopyText(targetId) {
 let deletePendingProvider = null;
 
 async function main() {
-  // ===== 先绑定所有按钮事件（不依赖任何 async 操作）=====
-  bindAllEvents();
-
   await loadConfig();
   renderAllCards();
   await applySavedTheme();
   await syncLoadState();
   syncSetupAutoTimer();
-}
 
-function bindAllEvents() {
   const themeBtn = document.getElementById("themeToggle");
   if (themeBtn) {
     themeBtn.addEventListener("click", async () => {
@@ -1077,11 +978,17 @@ function bindAllEvents() {
   }
 
   const addBtn = document.getElementById("addProviderBtn");
-  const fabAddBtn = document.getElementById("fabAddBtn");
-  const bottomAddBtn = document.getElementById("bottomAddBtn");
-  if (addBtn) addBtn.addEventListener("click", openProviderModal);
-  if (fabAddBtn) fabAddBtn.addEventListener("click", openProviderModal);
-  if (bottomAddBtn) bottomAddBtn.addEventListener("click", openProviderModal);
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      const modal = document.getElementById("providerModal");
+      if (modal) modal.style.display = "";
+      const input = document.getElementById("newProviderName");
+      if (input) input.value = "";
+      const urlInput = document.getElementById("newProviderUrl");
+      if (urlInput) urlInput.value = "";
+      if (input) input.focus();
+    });
+  }
 
   const providerNameInput = document.getElementById("newProviderName");
   const providerUrlInput = document.getElementById("newProviderUrl");
@@ -1125,11 +1032,12 @@ function bindAllEvents() {
 
   // ===== 同步 UI 事件绑定 =====
   const syncBtn = document.getElementById("syncBtn");
-  const mobileSyncBtn = document.getElementById("mobileSyncBtn");
-  const bottomSyncBtn = document.getElementById("bottomSyncBtn");
-  if (syncBtn) syncBtn.addEventListener("click", openSyncModal);
-  if (mobileSyncBtn) mobileSyncBtn.addEventListener("click", openSyncModal);
-  if (bottomSyncBtn) bottomSyncBtn.addEventListener("click", openSyncModal);
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => {
+      const modal = document.getElementById("syncModal");
+      if (modal) modal.style.display = "";
+    });
+  }
 
   document.getElementById("syncCloseBtn")?.addEventListener("click", () => {
     document.getElementById("syncModal").style.display = "none";
@@ -1143,12 +1051,6 @@ function bindAllEvents() {
   document.getElementById("syncIntervalSelect")?.addEventListener("change", syncSetInterval);
   document.getElementById("syncPullBtn")?.addEventListener("click", () => syncPull(false));
   document.getElementById("syncExportBtn")?.addEventListener("click", syncExport);
-
-  // P2P 局域网同步事件
-  document.getElementById("p2pShareBtn")?.addEventListener("click", p2pStartShare);
-  document.getElementById("p2pStopBtn")?.addEventListener("click", p2pStop);
-  document.getElementById("p2pPullBtn")?.addEventListener("click", p2pPull);
-  document.getElementById("p2pPushBtn")?.addEventListener("click", p2pPush);
 
   document.getElementById("syncImportConfirmBtn")?.addEventListener("click", syncImportKey);
   document.getElementById("syncImportCancelBtn")?.addEventListener("click", () => {
@@ -1171,19 +1073,3 @@ function bindAllEvents() {
   });
 }
 document.addEventListener("DOMContentLoaded", main);
-
-if (window.visualViewport) {
-  let lastHeight = window.visualViewport.height;
-  window.visualViewport.addEventListener("resize", () => {
-    const diff = lastHeight - window.visualViewport.height;
-    lastHeight = window.visualViewport.height;
-    if (diff > 100) {
-      const active = document.activeElement;
-      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
-        setTimeout(() => {
-          active.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 100);
-      }
-    }
-  });
-}

@@ -2,13 +2,13 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>API Key Manager</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="app.css?v=4" />
+  <link rel="stylesheet" href="app.css?v=3" />
 </head>
 <body>
   <div class="app">
@@ -17,7 +17,6 @@
         <div class="topbar-title">
           <img src="favicon.svg" class="logo-icon" alt="logo">
           <h1>API Keys</h1>
-          <button class="topbar-icon-btn" id="mobileSyncBtn" title="同步">🔄</button>
           <button class="theme-toggle" id="themeToggle" title="切换主题">🌗</button>
         </div>
         <p class="topbar-desc">管理多个 API Key，一键复制 OpenAI 格式调用信息</p>
@@ -29,19 +28,11 @@
 
       <div class="cards" id="cardsContainer"></div>
     </main>
-
-    <button class="fab-add" id="fabAddBtn" title="添加厂商">+</button>
-  </div>
-
-  <!-- 移动端底部操作栏 -->
-  <div class="bottom-bar">
-    <button class="bottom-btn secondary" id="bottomSyncBtn">🔄 同步</button>
-    <button class="bottom-btn primary" id="bottomAddBtn">+ 添加厂商</button>
   </div>
 
   <!-- 添加厂商弹窗 -->
-  <div class="modal-overlay modal-center-overlay" id="providerModal" style="display:none;">
-    <div class="modal modal-center">
+  <div class="modal-overlay" id="providerModal" style="display:none;">
+    <div class="modal">
       <div class="modal-header">添加厂商</div>
       <div class="modal-body">
         <input class="input" id="newProviderName" placeholder="厂商标识（如：openai）" autocomplete="off" spellcheck="false" />
@@ -82,38 +73,6 @@
             <button class="btn-save-key" id="syncSaveUrlBtn">保存</button>
           </div>
           <div class="sync-hint">从此 URL GET 请求获取加密配置，支持任意静态托管服务</div>
-        </div>
-
-        <!-- 局域网同步 -->
-        <div class="sync-section">
-          <div class="sync-section-title">📡 局域网同步（P2P）</div>
-          <div class="sync-hint" style="margin-bottom:10px;">
-            两台设备连同一个 WiFi，无需互联网、无需账号，直接传输加密配置。
-          </div>
-
-          <div class="p2p-share-area" id="p2pShareArea" style="display:none;">
-            <div class="p2p-qr-wrapper">
-              <div id="p2pQrCode" style="display:flex;justify-content:center;padding:12px;background:#fff;border-radius:12px;"></div>
-              <div class="p2p-addr" id="p2pAddr"></div>
-            </div>
-            <div class="sync-hint" style="text-align:center;margin-top:8px;">
-              用另一台设备扫码或输入地址连接
-            </div>
-            <div class="sync-row sync-key-actions" style="margin-top:10px;justify-content:center;">
-              <button class="btn-cancel-key" id="p2pStopBtn">停止分享</button>
-            </div>
-          </div>
-
-          <div class="p2p-connect-area" id="p2pConnectArea">
-            <div class="sync-row">
-              <input class="input sync-url-input" id="p2pAddrInput" placeholder="对端地址（如 192.168.1.100:30123）" autocomplete="off" spellcheck="false" />
-            </div>
-            <div class="sync-row sync-key-actions" style="margin-top:10px;">
-              <button class="btn-save-key" id="p2pShareBtn">📤 我来分享</button>
-              <button class="btn-save-key" id="p2pPullBtn">⬇ 从对端拉取</button>
-              <button class="btn-cancel-key" id="p2pPushBtn">⬆ 推送到对端</button>
-            </div>
-          </div>
         </div>
 
         <!-- 密钥管理 -->
@@ -214,6 +173,6 @@
   </div>
 
   <div class="toast-container"></div>
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
