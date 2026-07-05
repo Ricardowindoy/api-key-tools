@@ -1086,12 +1086,22 @@ async function p2pPull() {
   if (!addr) { toast("请输入对端地址", "error"); return; }
   if (!/^\d+\.\d+\.\d+\.\d+:\d+$/.test(addr)) { toast("地址格式错误，示例: 192.168.1.100:30123", "error"); return; }
   if (!syncState?.private_key_pem) { toast("请先配置私钥（用于解密）", "error"); return; }
+  if (!syncState?.public_key_pem) { toast("请先生成或导入公钥（用于拉取时的密钥交换）", "error"); return; }
 
   syncLog("正在从 " + addr + " 拉取...", "info");
   try {
-    const resp = await fetch("http://" + addr + "/sync");
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    // 1. 把自己的公钥发给对端，对端用它加密配置后返回
+    const resp = await fetch("http://" + addr + "/pull", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: syncState.public_key_pem,
+    });
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      throw new Error("HTTP " + resp.status + ": " + errBody);
+    }
     const payload = await resp.json();
+    // 2. 用自己的私钥解密（payload 是用自己公钥加密的）
     const remote = await invoke("p2p_decrypt_payload", { payloadJson: JSON.stringify(payload) });
 
     pendingRemoteConfig = remote;
@@ -1125,11 +1135,22 @@ async function p2pPush() {
   const addr = addrInput?.value.trim();
   if (!addr) { toast("请输入对端地址", "error"); return; }
   if (!/^\d+\.\d+\.\d+\.\d+:\d+$/.test(addr)) { toast("地址格式错误，示例: 192.168.1.100:30123", "error"); return; }
-  if (!syncState?.public_key_pem) { toast("请先生成或导入公钥（用于加密）", "error"); return; }
 
   syncLog("正在向 " + addr + " 推送...", "info");
   try {
-    const encrypted = await invoke("sync_encrypt_config");
+    // 1. 获取对端的公钥
+    const pubkeyResp = await fetch("http://" + addr + "/pubkey");
+    if (!pubkeyResp.ok) throw new Error("获取对端公钥失败: HTTP " + pubkeyResp.status);
+    const remotePubkey = await pubkeyResp.text();
+    if (!remotePubkey || !remotePubkey.includes("BEGIN RSA PUBLIC KEY")) {
+      throw new Error("对端返回的公钥格式无效");
+    }
+
+    // 2. 用对端的公钥加密自己的配置
+    const encrypted = await invoke("sync_encrypt_config_with_key", { publicKeyPem: remotePubkey });
+    if (!encrypted) throw new Error("加密失败");
+
+    // 3. 推送加密后的配置到对端
     const resp = await fetch("http://" + addr + "/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -191,6 +191,13 @@ fn sync_encrypt_config(app: tauri::AppHandle) -> Result<String, String> {
     sync::encrypt_config_to_string(&pub_key, &cfg)
 }
 
+/// 用指定的公钥加密当前配置（用于 P2P 推送）
+#[tauri::command]
+fn sync_encrypt_config_with_key(app: tauri::AppHandle, public_key_pem: String) -> Result<String, String> {
+    let cfg = config::load_config(&app);
+    sync::encrypt_config_to_string(&public_key_pem, &cfg)
+}
+
 /// 从配置的 URL 拉取并解密配置，合并到本地
 /// 返回解密后的配置，由前端决定是否合并
 #[tauri::command]
@@ -272,20 +279,20 @@ fn p2p_start_server(app: tauri::AppHandle) -> Result<(String, String), String> {
     let port = p2p::find_available_port()?;
 
     let cfg = config::load_config(&app);
+    let cfg_json = serde_json::to_string(&cfg).map_err(|e| format!("序列化失败: {}", e))?;
     let ss = state::load_sync_state(&app);
     let pub_key = ss.public_key_pem.ok_or("请先生成或导入密钥对")?;
-    let payload = sync::encrypt_config_to_string(&pub_key, &cfg)?;
 
     let addr = format!("{}:{}", ip, port);
     let server = p2p::P2PServer::start(
         &ip,
         port,
-        Some(payload),
+        cfg_json,
+        pub_key,
         {
             let app = app.clone();
             move |body| {
                 log::info!("P2P 收到新的加密配置");
-                // 暂存到全局状态，由前端决定同步方式
             }
         },
     )?;
@@ -332,16 +339,14 @@ fn p2p_get_status() -> Result<(bool, Option<String>), String> {
     }
 }
 
-/// 刷新分享的加密 payload（推送最新本地配置）
+/// 刷新分享的配置（推送最新本地配置）
 #[tauri::command]
 fn p2p_refresh_payload(app: tauri::AppHandle) -> Result<(), String> {
     let guard = p2p_server().lock().unwrap();
     if let Some(server) = guard.as_ref() {
-        let ss = state::load_sync_state(&app);
-        let pub_key = ss.public_key_pem.ok_or("未配置公钥")?;
         let cfg = config::load_config(&app);
-        let payload = sync::encrypt_config_to_string(&pub_key, &cfg)?;
-        server.set_payload(payload);
+        let cfg_json = serde_json::to_string(&cfg).map_err(|e| format!("序列化失败: {}", e))?;
+        server.set_config_json(cfg_json);
         Ok(())
     } else {
         Err("没有运行中的分享服务".into())
@@ -542,6 +547,7 @@ pub fn run() {
             sync_import_public_key,
             sync_clear_keys,
             sync_encrypt_config,
+            sync_encrypt_config_with_key,
             sync_fetch_remote,
             sync_merge_config,
             sync_overwrite_config,
