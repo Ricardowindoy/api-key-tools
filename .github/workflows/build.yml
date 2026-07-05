@@ -166,6 +166,19 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
 
+      - name: 注入 Android 相机权限
+        run: |
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            # 在 <manifest> 内部插入 CAMERA 权限
+            sed -i '/<uses-permission android:name="android.permission.INTERNET"\/>/a\    <uses-permission android:name="android.permission.CAMERA" />' "$MANIFEST"
+            echo "=== 已注入 CAMERA 权限 ==="
+            grep -n "CAMERA\|INTERNET" "$MANIFEST"
+          else
+            echo "WARNING: AndroidManifest.xml not found at $MANIFEST"
+            exit 1
+          fi
+
       - name: 生成 Android 图标资源
         run: cargo tauri icon build/icon.png
         continue-on-error: true
