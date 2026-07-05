@@ -149,6 +149,8 @@ function renderCard(provider) {
   card.className = "card";
   card.dataset.provider = provider;
 
+  const keyCount = state[provider].keys.length;
+
   card.innerHTML = `
     <div class="card-top">
       <div class="card-identity">
@@ -165,10 +167,20 @@ function renderCard(provider) {
     </div>
 
     <div class="card-form">
-      <div class="key-manage">
-        <div class="key-manage-header">
-          <label>已保存的 Key</label>
+      <div class="key-manage collapsed" id="keymanage-${provider}">
+        <div class="key-manage-header" id="keyheader-${provider}">
+          <div style="display:flex;align-items:center;">
+            <span class="toggle-arrow">▼</span>
+            <label>已保存的 Key</label>
+            <span class="key-count-badge">${keyCount}</span>
+          </div>
           <button class="btn-add-key" data-provider="${provider}">+ 添加</button>
+        </div>
+        <div class="key-selected-preview" id="keypreview-${provider}">
+          <div class="key-preview-left">
+            <div class="key-preview-name" id="keypreview-name-${provider}">暂无 Key</div>
+            <div class="key-preview-key" id="keypreview-key-${provider}"></div>
+          </div>
         </div>
         <div class="key-list" id="keylist-${provider}"></div>
         <div class="key-add-form" id="keyform-${provider}" style="display:none;">
@@ -237,6 +249,24 @@ function renderKeyList(provider) {
   if (!data) return;
   const keys = data.keys;
   const selectedId = keys.find((k) => k.selected)?.id || "";
+
+  // 更新计数徽章
+  const badge = document.querySelector(`#keymanage-${provider} .key-count-badge`);
+  if (badge) badge.textContent = keys.length;
+
+  // 更新收起状态的预览
+  const previewName = document.getElementById(`keypreview-name-${provider}`);
+  const previewKey = document.getElementById(`keypreview-key-${provider}`);
+  const selectedKey = keys.find((k) => k.selected) || keys[0];
+  if (previewName && previewKey) {
+    if (selectedKey) {
+      previewName.textContent = selectedKey.name || "未命名";
+      previewKey.textContent = maskKey(selectedKey.key);
+    } else {
+      previewName.textContent = "暂无 Key";
+      previewKey.textContent = "";
+    }
+  }
 
   el.innerHTML = "";
   if (keys.length === 0) {
@@ -500,12 +530,31 @@ function initCard(provider) {
   const select = document.getElementById(`select-${provider}`);
   const deleteBtn = document.querySelector(`.btn-delete-provider[data-provider="${provider}"]`);
   const urlText = document.getElementById(`urltext-${provider}`);
+  const keyHeader = document.getElementById(`keyheader-${provider}`);
+  const keyManage = document.getElementById(`keymanage-${provider}`);
 
   renderKeyList(provider);
 
+  // Key 列表展开/收起
+  if (keyHeader && keyManage) {
+    keyHeader.addEventListener("click", (e) => {
+      if (e.target.closest(".btn-add-key")) return;
+      keyManage.classList.toggle("collapsed");
+    });
+  }
+
   if (addBtn) {
-    addBtn.addEventListener("click", () => {
-      if (formEl) formEl.style.display = formEl.style.display === "none" ? "" : "none";
+    addBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (formEl) {
+        const isHidden = formEl.style.display === "none" || formEl.style.display === "";
+        if (isHidden) {
+          keyManage.classList.remove("collapsed");
+          formEl.style.display = "flex";
+        } else {
+          formEl.style.display = "none";
+        }
+      }
     });
   }
   if (cancelBtn) {

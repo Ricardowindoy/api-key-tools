@@ -214,7 +214,7 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), transparent);
 }
@@ -275,9 +275,9 @@ body::after {
 }
 
 /* ===== Form ===== */
-.card-form { padding: 22px 24px; }
+.card-form { padding: 16px 20px; }
 
-.form-group { margin-bottom: 18px; }
+.form-group { margin-bottom: 14px; }
 .form-group:last-child { margin-bottom: 0; }
 
 .form-group label {
@@ -294,8 +294,8 @@ body::after {
 
 .input {
   flex: 1;
-  height: 42px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 12px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -341,8 +341,8 @@ body::after {
 
 .select {
   flex: 1;
-  height: 42px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 12px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -355,8 +355,8 @@ body::after {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239aa0b8' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 14px center;
-  padding-right: 34px;
+  background-position: right 12px center;
+  padding-right: 32px;
 }
 
 .select:focus {
@@ -367,13 +367,13 @@ body::after {
 .select:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-refresh {
-  height: 42px;
-  padding: 0 18px;
+  height: 38px;
+  padding: 0 16px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--txt-a);
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
   font-weight: 500;
   cursor: pointer;
@@ -449,7 +449,7 @@ body::after {
 /* ===== Model Section ===== */
 .model-section {
   border-top: 1px solid var(--border);
-  margin: 0 24px;
+  margin: 0 20px;
 }
 
 .model-summary {
@@ -519,7 +519,7 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 
 /* ===== Copy Section ===== */
 .copy-section {
-  padding: 18px 24px;
+  padding: 14px 20px;
   border-top: 1px solid var(--border);
   background: linear-gradient(135deg, var(--accent-g), transparent);
 }
@@ -582,8 +582,8 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 
 /* ===== Key Management ===== */
 .key-manage {
-  margin-bottom: 18px;
-  padding: 16px 18px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
   background: var(--bg-chip);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -593,7 +593,9 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  user-select: none;
 }
 
 .key-manage-header label {
@@ -602,11 +604,76 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   color: var(--txt-b);
   text-transform: uppercase;
   letter-spacing: 0.6px;
+  pointer-events: none;
+}
+
+.key-manage-header .key-count-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent-g);
+  color: var(--accent-2);
+  margin-left: 8px;
+}
+
+.key-manage-header .toggle-arrow {
+  font-size: 10px;
+  color: var(--txt-c);
+  transition: transform var(--transition);
+  margin-right: 4px;
+}
+
+.key-manage.collapsed .toggle-arrow {
+  transform: rotate(-90deg);
+}
+
+.key-manage.collapsed .key-list,
+.key-manage.collapsed .key-add-form {
+  display: none;
+}
+
+.key-manage.collapsed .key-selected-preview {
+  display: flex;
+}
+
+.key-selected-preview {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--accent-g);
+  border: 1px solid var(--border-s);
+  border-radius: var(--radius-xs);
+  border-left: 3px solid var(--accent-2);
+  margin-top: 8px;
+}
+
+.key-selected-preview .key-preview-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.key-selected-preview .key-preview-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt-a);
+}
+
+.key-selected-preview .key-preview-key {
+  font-size: 11px;
+  color: var(--txt-c);
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn-add-key {
   font-size: 12px;
-  padding: 5px 14px;
+  padding: 4px 12px;
   background: var(--accent-g);
   color: var(--accent-2);
   border: 1px solid var(--border-s);
@@ -623,13 +690,13 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   border-color: var(--accent-2);
 }
 
-.key-list { display: flex; flex-direction: column; gap: 6px; }
+.key-list { display: flex; flex-direction: column; gap: 5px; }
 
 .key-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
@@ -658,13 +725,13 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 }
 
 .key-item-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--txt-a);
 }
 
 .key-item-key {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--txt-c);
   font-family: "SF Mono", "Fira Code", Consolas, monospace;
   white-space: nowrap;
@@ -677,7 +744,7 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   border: none;
   color: var(--txt-c);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   padding: 4px 8px;
   border-radius: var(--radius-xs);
   transition: all var(--transition);
@@ -691,10 +758,10 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 }
 
 .key-add-form {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .key-form-actions {
@@ -704,7 +771,7 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 }
 
 .btn-save-key, .btn-cancel-key {
-  padding: 8px 16px;
+  padding: 7px 14px;
   border-radius: var(--radius-xs);
   font-size: 13px;
   font-family: inherit;
