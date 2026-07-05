@@ -155,6 +155,7 @@
           <div class="p2p-connect-area" id="p2pConnectArea">
             <div class="sync-row">
               <input class="input sync-url-input" id="p2pAddrInput" placeholder="对端地址（如 192.168.1.100:30123）" autocomplete="off" spellcheck="false" />
+              <button class="icon-btn" id="p2pScanBtn" title="扫描二维码">📷</button>
             </div>
             <div class="sync-row sync-key-actions" style="margin-top:10px;">
               <button class="btn-save-key" id="p2pPullBtn">⬇ 拉取</button>
@@ -204,7 +205,25 @@
     </div>
   </div>
 
+  <!-- 二维码扫码弹窗 -->
+  <div class="modal-overlay" id="qrScannerModal" style="display:none;">
+    <div class="modal modal-sm">
+      <div class="modal-header">扫描二维码</div>
+      <div class="modal-body" style="text-align:center;">
+        <div class="qr-scanner-container">
+          <video id="qrScannerVideo" autoplay playsinline muted style="width:280px;height:210px;border-radius:10px;background:#000;object-fit:cover;"></video>
+          <canvas id="qrScannerCanvas" style="display:none;"></canvas>
+          <div class="qr-scanner-hint" id="qrScannerHint">正在等待摄像头...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-key" id="qrScannerCancelBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container"></div>
-  <script src="app.js?v=8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

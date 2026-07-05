@@ -1008,6 +1008,78 @@ async function p2pStop() {
   }
 }
 
+// ===== P2P 二维码扫描 =====
+let p2pScanStream = null;
+let p2pScanTimer = null;
+
+async function p2pScanQrCode() {
+  const modal = document.getElementById("qrScannerModal");
+  const video = document.getElementById("qrScannerVideo");
+  const canvas = document.getElementById("qrScannerCanvas");
+  const hint = document.getElementById("qrScannerHint");
+
+  if (!modal || !video) return;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: 640, height: 480 },
+      audio: false,
+    });
+    p2pScanStream = stream;
+    video.srcObject = stream;
+    await video.play();
+    modal.style.display = "";
+    if (hint) hint.textContent = "正在扫描二维码...";
+
+    const ctx = canvas.getContext("2d");
+    p2pScanTimer = setInterval(() => {
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code) {
+        const url = code.data;
+        // 解析二维码中的地址（格式：http://ip:port/sync）
+        const match = url.match(/https?:\/\/(\d+\.\d+\.\d+\.\d+:\d+)/);
+        if (match) {
+          const addr = match[1];
+          const input = document.getElementById("p2pAddrInput");
+          if (input) input.value = addr;
+          toast("已识别对端地址: " + addr);
+          p2pStopScanning();
+        } else {
+          if (hint) hint.textContent = "二维码内容不是有效地址: " + url;
+        }
+      }
+    }, 300);
+  } catch (e) {
+    let msg = e?.message || e;
+    if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+      msg = "摄像头权限被拒绝，请在系统设置中允许摄像头访问";
+    } else if (e.name === "NotFoundError") {
+      msg = "未找到摄像头设备";
+    }
+    toast("扫码失败: " + msg, "error");
+  }
+}
+
+function p2pStopScanning() {
+  if (p2pScanTimer) {
+    clearInterval(p2pScanTimer);
+    p2pScanTimer = null;
+  }
+  if (p2pScanStream) {
+    p2pScanStream.getTracks().forEach((t) => t.stop());
+    p2pScanStream = null;
+  }
+  const video = document.getElementById("qrScannerVideo");
+  if (video) video.srcObject = null;
+  const modal = document.getElementById("qrScannerModal");
+  if (modal) modal.style.display = "none";
+}
+
 async function p2pPull() {
   const addrInput = document.getElementById("p2pAddrInput");
   const addr = addrInput?.value.trim();
@@ -1039,7 +1111,10 @@ async function p2pPull() {
     document.getElementById("syncConfirmModal").style.display = "";
     syncLog("拉取成功", "success");
   } catch (e) {
-    const msg = e?.message || e;
+    let msg = e?.message || e;
+    if (e instanceof TypeError && msg.includes("fetch")) {
+      msg = "无法连接，请确认对端已开启分享，且地址和端口正确";
+    }
     toast("拉取失败: " + msg, "error");
     syncLog("拉取失败: " + msg, "error");
   }
@@ -1069,7 +1144,10 @@ async function p2pPush() {
       throw new Error("服务端返回异常");
     }
   } catch (e) {
-    const msg = e?.message || e;
+    let msg = e?.message || e;
+    if (e instanceof TypeError && msg.includes("fetch")) {
+      msg = "无法连接，请确认对端已开启分享（点击「我来分享」），且地址和端口正确";
+    }
     toast("推送失败: " + msg, "error");
     syncLog("推送失败: " + msg, "error");
   }
@@ -1186,6 +1264,12 @@ async function main() {
   document.getElementById("p2pStopBtn")?.addEventListener("click", p2pStop);
   document.getElementById("p2pPullBtn")?.addEventListener("click", p2pPull);
   document.getElementById("p2pPushBtn")?.addEventListener("click", p2pPush);
+  document.getElementById("p2pScanBtn")?.addEventListener("click", p2pScanQrCode);
+  document.getElementById("qrScannerCancelBtn")?.addEventListener("click", p2pStopScanning);
+  // 点击扫码弹窗外部遮罩时停止扫描
+  document.getElementById("qrScannerModal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) p2pStopScanning();
+  });
 
   // 复制密钥按钮
   $$(".btn-copy-mini").forEach((btn) => {

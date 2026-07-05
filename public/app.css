@@ -900,6 +900,9 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   border-radius: var(--radius);
   width: 440px;
   max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow), 0 0 0 1px rgba(124, 58, 237, 0.12) inset;
   backdrop-filter: var(--backdrop);
   -webkit-backdrop-filter: var(--backdrop);
@@ -918,6 +921,7 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.2px;
+  flex-shrink: 0;
 }
 
 .modal-body {
@@ -925,6 +929,8 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   font-size: 14px;
   color: var(--txt-b);
   line-height: 1.5;
+  overflow-y: auto;
+  max-height: 60vh;
 }
 
 .modal-body .input {
@@ -936,6 +942,7 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* ===== Sync Modal ===== */
@@ -1171,6 +1178,19 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
   border-color: var(--accent-2);
   color: var(--accent-2);
   transform: translateY(-1px);
+}
+
+/* ===== QR Scanner ===== */
+.qr-scanner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.qr-scanner-hint {
+  font-size: 13px;
+  color: var(--txt-c);
 }
 
 /* ===== Toast ===== */
