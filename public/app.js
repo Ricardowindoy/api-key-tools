@@ -151,11 +151,8 @@ function renderAllCards() {
         <div class="empty-state-icon">🔑</div>
         <div class="empty-state-title">还没有 API Key</div>
         <div class="empty-state-desc">点击下方「添加厂商」按钮，开始管理你的第一个 API Key</div>
-        <button class="empty-state-btn" id="emptyAddBtn">+ 添加厂商</button>
       </div>
     `;
-    const emptyBtn = document.getElementById("emptyAddBtn");
-    if (emptyBtn) emptyBtn.addEventListener("click", openProviderModal);
     return;
   }
   
