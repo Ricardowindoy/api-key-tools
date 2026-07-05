@@ -132,6 +132,38 @@
           <div class="sync-log" id="syncLog"></div>
         </div>
 
+        <!-- 局域网同步 -->
+        <div class="sync-section">
+          <div class="sync-section-title">📡 局域网同步（P2P）</div>
+          <div class="sync-hint" style="margin-bottom:10px;">
+            两台设备连同一个 WiFi，无需互联网和账号，直接传输加密配置。
+          </div>
+
+          <div class="p2p-share-area" id="p2pShareArea" style="display:none;">
+            <div class="p2p-qr-wrapper">
+              <div id="p2pQrCode" style="display:flex;justify-content:center;padding:12px;background:#fff;border-radius:12px;"></div>
+              <div class="p2p-addr" id="p2pAddr"></div>
+            </div>
+            <div class="sync-hint" style="text-align:center;margin-top:8px;">
+              用另一台设备扫码或输入地址连接
+            </div>
+            <div class="sync-row sync-key-actions" style="margin-top:10px;justify-content:center;">
+              <button class="btn-cancel-key" id="p2pStopBtn">停止分享</button>
+            </div>
+          </div>
+
+          <div class="p2p-connect-area" id="p2pConnectArea">
+            <div class="sync-row">
+              <input class="input sync-url-input" id="p2pAddrInput" placeholder="对端地址（如 192.168.1.100:30123）" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="sync-row sync-key-actions" style="margin-top:10px;">
+              <button class="btn-save-key" id="p2pPullBtn">⬇ 拉取</button>
+              <button class="btn-cancel-key" id="p2pPushBtn">⬆ 推送</button>
+              <button class="btn-save-key" id="p2pShareBtn">我来分享</button>
+            </div>
+          </div>
+        </div>
+
         <!-- 加密说明 -->
         <div class="sync-footer-note">
           <strong>安全说明：</strong>

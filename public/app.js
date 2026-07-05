@@ -963,6 +963,118 @@ function syncCopyText(targetId) {
   );
 }
 
+// ===== P2P 局域网同步 =====
+let p2pAddr = "";
+let p2pQrSvg = "";
+let p2pPollTimer = null;
+
+async function p2pStartShare() {
+  if (!syncState?.public_key_pem) {
+    toast("请先生成或导入密钥对（公钥用于加密）", "error");
+    return;
+  }
+  try {
+    syncLog("正在启动 P2P 分享服务...", "info");
+    const [addr, qrcodeSvg] = await invoke("p2p_start_server");
+    p2pAddr = addr;
+    p2pQrSvg = qrcodeSvg;
+
+    document.getElementById("p2pShareArea").style.display = "";
+    document.getElementById("p2pConnectArea").style.display = "none";
+    document.getElementById("p2pAddr").textContent = "http://" + addr + "/sync";
+    document.getElementById("p2pQrCode").innerHTML = qrcodeSvg;
+
+    syncLog("P2P 分享已启动: " + addr, "success");
+    toast("分享已启动，扫码或输入地址连接");
+  } catch (e) {
+    const msg = e?.message || e;
+    toast("启动分享失败: " + msg, "error");
+    syncLog("启动分享失败: " + msg, "error");
+  }
+}
+
+async function p2pStop() {
+  try {
+    await invoke("p2p_stop_server");
+    p2pAddr = "";
+    p2pQrSvg = "";
+    document.getElementById("p2pShareArea").style.display = "none";
+    document.getElementById("p2pConnectArea").style.display = "";
+    if (p2pPollTimer) { clearInterval(p2pPollTimer); p2pPollTimer = null; }
+    syncLog("P2P 分享已停止", "info");
+    toast("已停止分享");
+  } catch (e) {
+    toast("停止失败: " + (e?.message || e), "error");
+  }
+}
+
+async function p2pPull() {
+  const addrInput = document.getElementById("p2pAddrInput");
+  const addr = addrInput?.value.trim();
+  if (!addr) { toast("请输入对端地址", "error"); return; }
+  if (!/^\d+\.\d+\.\d+\.\d+:\d+$/.test(addr)) { toast("地址格式错误，示例: 192.168.1.100:30123", "error"); return; }
+  if (!syncState?.private_key_pem) { toast("请先配置私钥（用于解密）", "error"); return; }
+
+  syncLog("正在从 " + addr + " 拉取...", "info");
+  try {
+    const resp = await fetch("http://" + addr + "/sync");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const payload = await resp.json();
+    const remote = await invoke("p2p_decrypt_payload", { payloadJson: JSON.stringify(payload) });
+
+    pendingRemoteConfig = remote;
+    const providers = Object.keys(remote);
+    const totalKeys = providers.reduce((sum, p) => sum + (remote[p]?.keys?.length || 0), 0);
+    const body = document.getElementById("syncConfirmBody");
+    if (body) {
+      body.innerHTML = `
+        <p>从 ${addr} 获取到：</p>
+        <ul style="margin:8px 0;padding-left:20px;">
+          <li>${providers.length} 个厂商</li>
+          <li>${totalKeys} 个 API Key</li>
+        </ul>
+        <p style="margin-top:8px;font-size:13px;color:var(--txt-b);">选择同步方式：</p>
+      `;
+    }
+    document.getElementById("syncConfirmModal").style.display = "";
+    syncLog("拉取成功", "success");
+  } catch (e) {
+    const msg = e?.message || e;
+    toast("拉取失败: " + msg, "error");
+    syncLog("拉取失败: " + msg, "error");
+  }
+}
+
+async function p2pPush() {
+  const addrInput = document.getElementById("p2pAddrInput");
+  const addr = addrInput?.value.trim();
+  if (!addr) { toast("请输入对端地址", "error"); return; }
+  if (!/^\d+\.\d+\.\d+\.\d+:\d+$/.test(addr)) { toast("地址格式错误，示例: 192.168.1.100:30123", "error"); return; }
+  if (!syncState?.public_key_pem) { toast("请先生成或导入公钥（用于加密）", "error"); return; }
+
+  syncLog("正在向 " + addr + " 推送...", "info");
+  try {
+    const encrypted = await invoke("sync_encrypt_config");
+    const resp = await fetch("http://" + addr + "/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: encrypted,
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    if (data.ok) {
+      toast("推送成功");
+      syncLog("推送成功", "success");
+    } else {
+      throw new Error("服务端返回异常");
+    }
+  } catch (e) {
+    const msg = e?.message || e;
+    toast("推送失败: " + msg, "error");
+    syncLog("推送失败: " + msg, "error");
+  }
+}
+
 // ===== Bootstrap =====
 let deletePendingProvider = null;
 
@@ -1068,6 +1180,12 @@ async function main() {
     document.getElementById("syncConfirmModal").style.display = "none";
     pendingRemoteConfig = null;
   });
+
+  // P2P 局域网同步事件
+  document.getElementById("p2pShareBtn")?.addEventListener("click", p2pStartShare);
+  document.getElementById("p2pStopBtn")?.addEventListener("click", p2pStop);
+  document.getElementById("p2pPullBtn")?.addEventListener("click", p2pPull);
+  document.getElementById("p2pPushBtn")?.addEventListener("click", p2pPush);
 
   // 复制密钥按钮
   $$(".btn-copy-mini").forEach((btn) => {

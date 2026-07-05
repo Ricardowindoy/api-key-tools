@@ -1114,6 +1114,42 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
 }
 .sync-footer-note strong { color: var(--accent-2); }
 
+/* ===== P2P 局域网同步 ===== */
+.p2p-share-area {
+  text-align: center;
+}
+
+.p2p-qr-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.p2p-qr-wrapper svg {
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.p2p-addr {
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 13px;
+  color: var(--accent);
+  background: var(--bg-input);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  user-select: all;
+}
+
+@media (max-width: 480px) {
+  .p2p-qr-wrapper svg {
+    width: 160px;
+    height: 160px;
+  }
+}
+
 /* ===== Sync Button in Topbar ===== */
 .btn-sync {
   display: inline-flex;
