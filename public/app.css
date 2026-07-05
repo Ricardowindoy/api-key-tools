@@ -1547,9 +1547,14 @@ details[open] > .model-summary::before { transform: rotate(90deg); }
     -webkit-backdrop-filter: blur(4px);
   }
 
-  .modal-center-overlay {
-    align-items: center;
-    justify-content: center;
+  .modal-overlay.modal-center-overlay {
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  #providerModal.modal-overlay {
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .modal {
