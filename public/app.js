@@ -123,6 +123,22 @@ function normalizeModels(raw) {
     .filter((m) => m.id);
 }
 
+// ===== 模态框控制（全局）=====
+function openProviderModal() {
+  const modal = document.getElementById("providerModal");
+  if (modal) modal.style.display = "";
+  const input = document.getElementById("newProviderName");
+  if (input) input.value = "";
+  const urlInput = document.getElementById("newProviderUrl");
+  if (urlInput) urlInput.value = "";
+  if (input) input.focus();
+}
+
+function openSyncModal() {
+  const modal = document.getElementById("syncModal");
+  if (modal) modal.style.display = "";
+}
+
 // ===== 动态卡片渲染 =====
 function renderAllCards() {
   const container = document.getElementById("cardsContainer");
@@ -1061,15 +1077,6 @@ async function main() {
   const addBtn = document.getElementById("addProviderBtn");
   const fabAddBtn = document.getElementById("fabAddBtn");
   const bottomAddBtn = document.getElementById("bottomAddBtn");
-  const openProviderModal = () => {
-    const modal = document.getElementById("providerModal");
-    if (modal) modal.style.display = "";
-    const input = document.getElementById("newProviderName");
-    if (input) input.value = "";
-    const urlInput = document.getElementById("newProviderUrl");
-    if (urlInput) urlInput.value = "";
-    if (input) input.focus();
-  };
   if (addBtn) addBtn.addEventListener("click", openProviderModal);
   if (fabAddBtn) fabAddBtn.addEventListener("click", openProviderModal);
   if (bottomAddBtn) bottomAddBtn.addEventListener("click", openProviderModal);
@@ -1118,10 +1125,6 @@ async function main() {
   const syncBtn = document.getElementById("syncBtn");
   const mobileSyncBtn = document.getElementById("mobileSyncBtn");
   const bottomSyncBtn = document.getElementById("bottomSyncBtn");
-  const openSyncModal = () => {
-    const modal = document.getElementById("syncModal");
-    if (modal) modal.style.display = "";
-  };
   if (syncBtn) syncBtn.addEventListener("click", openSyncModal);
   if (mobileSyncBtn) mobileSyncBtn.addEventListener("click", openSyncModal);
   if (bottomSyncBtn) bottomSyncBtn.addEventListener("click", openSyncModal);
