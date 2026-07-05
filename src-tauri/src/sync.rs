@@ -67,7 +67,7 @@ pub fn generate_keypair() -> Result<KeyPair, String> {
         .map_err(|e| format!("导出公钥失败: {}", e))?;
 
     Ok(KeyPair {
-        private_pem,
+        private_pem: private_pem.to_string(),
         public_pem,
     })
 }
