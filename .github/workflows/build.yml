@@ -166,6 +166,10 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup_ndk.outputs.ndk-path }}
 
+      - name: 生成 Android 图标资源
+        run: cargo tauri icon build/icon.png
+        continue-on-error: true
+
       - name: 构建 Android APK（未签名 release，arm64 单架构）
         run: cargo tauri android build --apk --target aarch64
         env:
