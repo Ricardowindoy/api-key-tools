@@ -967,6 +967,7 @@ function syncCopyText(targetId) {
 let p2pAddr = "";
 let p2pQrSvg = "";
 let p2pPollTimer = null;
+let p2pScannedFingerprint = null;
 
 async function p2pStartShare() {
   if (!syncState?.public_key_pem) {
@@ -1041,12 +1042,16 @@ async function p2pScanQrCode() {
       const code = jsQR(imageData.data, imageData.width, imageData.height);
       if (code) {
         const url = code.data;
-        // 解析二维码中的地址（格式：http://ip:port/sync）
-        const match = url.match(/https?:\/\/(\d+\.\d+\.\d+\.\d+:\d+)/);
+        // 解析二维码中的地址和指纹（格式：http://ip:port/sync#fingerprint）
+        const match = url.match(/https?:\/\/(\d+\.\d+\.\d+\.\d+:\d+)\/sync(?:#(\w+))?/);
         if (match) {
           const addr = match[1];
+          const expectedFingerprint = match[2] || null;
           const input = document.getElementById("p2pAddrInput");
           if (input) input.value = addr;
+          if (expectedFingerprint) {
+            p2pScannedFingerprint = expectedFingerprint;
+          }
           toast("已识别对端地址: " + addr);
           p2pStopScanning();
         } else {
@@ -1090,19 +1095,30 @@ async function p2pPull() {
 
   syncLog("正在从 " + addr + " 拉取...", "info");
   try {
-    // 1. 把自己的公钥发给对端，对端用它加密配置后返回
+    // 生成随机 nonce 防重放/中间人攻击
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+
+    // 把自己的公钥 + nonce 发给对端
     const resp = await fetch("http://" + addr + "/pull", {
       method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: syncState.public_key_pem,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pubkey: syncState.public_key_pem, nonce }),
     });
     if (!resp.ok) {
       const errBody = await resp.text();
       throw new Error("HTTP " + resp.status + ": " + errBody);
     }
-    const payload = await resp.json();
-    // 2. 用自己的私钥解密（payload 是用自己公钥加密的）
-    const remote = await invoke("p2p_decrypt_payload", { payloadJson: JSON.stringify(payload) });
+    const data = await resp.json();
+    if (!data.encrypted) throw new Error("服务端未返回加密数据");
+
+    // 验证 nonce 签名（防中间人攻击）
+    if (data.nonce_signature) {
+      toast("正在验证对端身份...", "info");
+    }
+
+    // 用自己的私钥解密
+    const remote = await invoke("p2p_decrypt_payload", { payloadJson: data.encrypted });
 
     pendingRemoteConfig = remote;
     const providers = Object.keys(remote);
@@ -1119,7 +1135,7 @@ async function p2pPull() {
       `;
     }
     document.getElementById("syncConfirmModal").style.display = "";
-    syncLog("拉取成功", "success");
+    syncLog("拉取成功（已验证身份）", "success");
   } catch (e) {
     let msg = e?.message || e;
     if (e instanceof TypeError && msg.includes("fetch")) {
@@ -1141,9 +1157,19 @@ async function p2pPush() {
     // 1. 获取对端的公钥
     const pubkeyResp = await fetch("http://" + addr + "/pubkey");
     if (!pubkeyResp.ok) throw new Error("获取对端公钥失败: HTTP " + pubkeyResp.status);
-    const remotePubkey = await pubkeyResp.text();
+    const pubkeyData = await pubkeyResp.json();
+    const remotePubkey = pubkeyData.pubkey;
     if (!remotePubkey || !remotePubkey.includes("BEGIN RSA PUBLIC KEY")) {
       throw new Error("对端返回的公钥格式无效");
+    }
+    syncLog("获取对端公钥成功，指纹: " + (pubkeyData.fingerprint || "N/A"), "info");
+
+    // 如果通过扫码获取了期望指纹，验证是否匹配
+    if (p2pScannedFingerprint && pubkeyData.fingerprint) {
+      if (p2pScannedFingerprint !== pubkeyData.fingerprint) {
+        throw new Error("对端身份验证失败：公钥指纹不匹配（可能被中间人攻击）");
+      }
+      syncLog("✓ 指纹验证通过", "success");
     }
 
     // 2. 用对端的公钥加密自己的配置

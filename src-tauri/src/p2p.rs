@@ -85,20 +85,18 @@ pub struct P2PServer {
     running: Arc<Mutex<bool>>,
     config_json: Arc<Mutex<String>>,
     pub_key_pem: Arc<Mutex<String>>,
+    priv_key_pem: Arc<Mutex<String>>,
     received_payload: Arc<Mutex<Option<String>>>,
 }
 
 impl P2PServer {
     /// 启动 P2P 同步服务
-    ///
-    /// - `config_json`：分享端当前的配置 JSON（原始未加密）
-    /// - `pub_key_pem`：分享端的公钥 PEM（供拉取端加密推送）
-    /// - `on_push`：收到推送数据时的回调
     pub fn start<F>(
         ip: &str,
         port: u16,
         config_json: String,
         pub_key_pem: String,
+        priv_key_pem: String,
         on_push: F,
     ) -> Result<Self, String>
     where
@@ -111,11 +109,13 @@ impl P2PServer {
         let running = Arc::new(Mutex::new(true));
         let config_json = Arc::new(Mutex::new(config_json));
         let pub_key_pem = Arc::new(Mutex::new(pub_key_pem));
+        let priv_key_pem = Arc::new(Mutex::new(priv_key_pem));
         let received_payload: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
         let running_clone = running.clone();
         let config_clone = config_json.clone();
         let pubkey_clone = pub_key_pem.clone();
+        let privkey_clone = priv_key_pem.clone();
         let received_clone = received_payload.clone();
         let on_push = Arc::new(Mutex::new(on_push));
 
@@ -136,21 +136,39 @@ impl P2PServer {
                     // GET /pubkey → 返回分享端的公钥
                     (Method::Get, "/pubkey") => {
                         let pk = pubkey_clone.lock().unwrap().clone();
-                        let _ = request.respond(ok_response(&pk));
+                        let fp = sync::pubkey_fingerprint(&pk, 8);
+                        let body = serde_json::json!({
+                            "pubkey": pk,
+                            "fingerprint": fp,
+                        });
+                        let _ = request.respond(ok_response(&body.to_string()));
                     }
 
-                    // POST /pull → 拉取端发送自己的公钥，服务端用该公钥加密配置后返回
+                    // POST /pull → 拉取端发送(自己的公钥 + 随机 nonce)
+                    // 服务端用拉取端公钥加密配置，并用自己的私钥签名 nonce
                     (Method::Post, "/pull") => {
-                        let mut caller_pubkey = String::new();
-                        let _ = request.as_reader().read_to_string(&mut caller_pubkey);
-                        let caller_pubkey = caller_pubkey.trim().to_string();
-                        if caller_pubkey.is_empty() {
+                        let mut body = String::new();
+                        let _ = request.as_reader().read_to_string(&mut body);
+                        let req: serde_json::Value = match serde_json::from_str(&body) {
+                            Ok(v) => v,
+                            Err(_) => {
+                                let _ = request.respond(json_response(
+                                    r#"{"error":"invalid json"}"#,
+                                    StatusCode(400),
+                                ));
+                                continue;
+                            }
+                        };
+                        let caller_pubkey = req["pubkey"].as_str().unwrap_or("").to_string();
+                        let nonce = req["nonce"].as_str().unwrap_or("").to_string();
+                        if caller_pubkey.is_empty() || nonce.is_empty() {
                             let _ = request.respond(json_response(
-                                r#"{"error":"missing caller public key"}"#,
+                                r#"{"error":"missing pubkey or nonce"}"#,
                                 StatusCode(400),
                             ));
                             continue;
                         }
+                        // 用拉取端公钥加密配置
                         let cfg_str = config_clone.lock().unwrap().clone();
                         let cfg: Config = match serde_json::from_str(&cfg_str) {
                             Ok(c) => c,
@@ -162,20 +180,27 @@ impl P2PServer {
                                 continue;
                             }
                         };
-                        match sync::encrypt_config_to_string(&caller_pubkey, &cfg) {
-                            Ok(encrypted) => {
-                                let _ = request.respond(ok_response(&encrypted));
-                            }
+                        let encrypted = match sync::encrypt_config_to_string(&caller_pubkey, &cfg) {
+                            Ok(e) => e,
                             Err(e) => {
                                 let _ = request.respond(json_response(
                                     &format!(r#"{{"error":"encrypt: {}"}}"#, e),
                                     StatusCode(500),
                                 ));
+                                continue;
                             }
-                        }
+                        };
+                        // 用服务端私钥签名 nonce（防 MITM）
+                        let server_priv = privkey_clone.lock().unwrap().clone();
+                        let nonce_sig = sync::sign_data(&server_priv, nonce.as_bytes()).ok();
+                        let resp_body = serde_json::json!({
+                            "encrypted": encrypted,
+                            "nonce_signature": nonce_sig,
+                        });
+                        let _ = request.respond(ok_response(&resp_body.to_string()));
                     }
 
-                    // POST /sync → 推送到服务端（已用服务端公钥加密的 payload）
+                    // POST /sync → 对端推送到本机（已用本机公钥加密）
                     (Method::Post, "/sync") => {
                         let mut body = String::new();
                         let _ = request.as_reader().read_to_string(&mut body);
@@ -225,6 +250,7 @@ impl P2PServer {
             running,
             config_json,
             pub_key_pem,
+            priv_key_pem,
             received_payload,
         })
     }

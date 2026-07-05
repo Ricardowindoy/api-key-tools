@@ -16,10 +16,12 @@ use rand::RngCore;
 use rsa::{
     oaep::Oaep,
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
+    pss::{Pss, Signature as PssSignature},
+    signature::{RandomizedSigner, SignatureEncoding, Verifier},
     RsaPrivateKey, RsaPublicKey,
 };
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 
 use crate::config::Config;
 
@@ -214,6 +216,39 @@ pub async fn fetch_and_decrypt(url: &str, private_pem: &str) -> Result<Config, S
 pub fn encrypt_config_to_string(public_pem: &str, config: &Config) -> Result<String, String> {
     let payload = encrypt_config(public_pem, config)?;
     serde_json::to_string_pretty(&payload).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 用私钥对数据进行 RSA-PSS-SHA256 签名，返回 Base64 签名
+pub fn sign_data(private_pem: &str, data: &[u8]) -> Result<String, String> {
+    let priv_key = RsaPrivateKey::from_pkcs1_pem(private_pem)
+        .map_err(|e| format!("私钥无效: {}", e))?;
+    let pss = Pss::new::<Sha256>();
+    let signature: PssSignature = priv_key
+        .sign_with_rng(&mut rand::thread_rng(), pss, data)
+        .map_err(|e| format!("签名失败: {}", e))?;
+    Ok(B64.encode(signature.to_bytes()))
+}
+
+/// 用公钥验证 RSA-PSS-SHA256 签名
+pub fn verify_signature(public_pem: &str, data: &[u8], signature_b64: &str) -> Result<bool, String> {
+    let pub_key = RsaPublicKey::from_pkcs1_pem(public_pem)
+        .map_err(|e| format!("公钥无效: {}", e))?;
+    let sig_bytes = B64
+        .decode(signature_b64)
+        .map_err(|e| format!("签名 base64 解码失败: {}", e))?;
+    let signature = PssSignature::try_from(sig_bytes.as_slice())
+        .map_err(|e| format!("签名格式无效: {}", e))?;
+    let pss = Pss::new::<Sha256>();
+    match pub_key.verify(pss, data, &signature) {
+        Ok(()) => Ok(true),
+        Err(_) => Ok(false),
+    }
+}
+
+/// 计算公钥 PEM 的 SHA-256 指纹（hex，取前 N 字符）
+pub fn pubkey_fingerprint(public_pem: &str, chars: usize) -> String {
+    let hash = Sha256::digest(public_pem.as_bytes());
+    hash.iter().take(chars.min(32)).map(|b| format!("{:02x}", b)).collect()
 }
 
 fn chrono_now_secs() -> i64 {

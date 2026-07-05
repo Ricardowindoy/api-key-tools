@@ -282,13 +282,16 @@ fn p2p_start_server(app: tauri::AppHandle) -> Result<(String, String), String> {
     let cfg_json = serde_json::to_string(&cfg).map_err(|e| format!("序列化失败: {}", e))?;
     let ss = state::load_sync_state(&app);
     let pub_key = ss.public_key_pem.ok_or("请先生成或导入密钥对")?;
+    let priv_key = ss.private_key_pem.clone().ok_or("未配置私钥，无法签名")?;
 
     let addr = format!("{}:{}", ip, port);
+    let fingerprint = sync::pubkey_fingerprint(&pub_key, 8);
     let server = p2p::P2PServer::start(
         &ip,
         port,
         cfg_json,
         pub_key,
+        priv_key,
         {
             let app = app.clone();
             move |body| {
@@ -297,7 +300,7 @@ fn p2p_start_server(app: tauri::AppHandle) -> Result<(String, String), String> {
         },
     )?;
 
-    let qrcode_svg = p2p::generate_qrcode_svg(&format!("http://{}/sync", addr))?;
+    let qrcode_svg = p2p::generate_qrcode_svg(&format!("http://{}/sync#{}", addr, fingerprint))?;
 
     {
         let mut guard = p2p_server().lock().unwrap();
