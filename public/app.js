@@ -42,12 +42,12 @@ async function saveSelect(provider, { keyId, modelId } = {}) {
 
 async function saveConfig() {
   const config = {};
-  // 转换为 Rust 端期望的 snake_case 格式
   Object.keys(state).forEach((p) => {
     config[p] = {
       base_url: state[p].baseUrl,
       keys: state[p].keys,
       selected_model: state[p].selectedModel,
+      collapsed: state[p].collapsed !== false,
     };
   });
   try {
@@ -70,6 +70,7 @@ async function loadConfig() {
         keys: Array.isArray(section.keys) ? section.keys : [],
         models: [],
         selectedModel: section.selected_model || "",
+        collapsed: section.collapsed !== false,
       };
     });
   } catch (e) {
@@ -167,7 +168,7 @@ function renderCard(provider) {
     </div>
 
     <div class="card-form">
-      <div class="key-manage collapsed" id="keymanage-${provider}">
+      <div class="key-manage${state[provider]?.collapsed !== false ? ' collapsed' : ''}" id="keymanage-${provider}">
         <div class="key-manage-header" id="keyheader-${provider}">
           <div style="display:flex;align-items:center;">
             <span class="toggle-arrow">▼</span>
@@ -343,7 +344,7 @@ function selectKey(provider, id) {
 async function addProvider(name, baseUrl) {
   if (!name || !baseUrl) { toast("请填写厂商名称和 Base URL", "error"); return; }
   if (state[name]) { toast("厂商 \"" + name + "\" 已存在", "error"); return; }
-  state[name] = { baseUrl, keys: [], models: [], selectedModel: "" };
+  state[name] = { baseUrl, keys: [], models: [], selectedModel: "", collapsed: true };
   renderAllCards();
   await saveConfig();
   toast("厂商 \"" + name + "\" 已添加");
@@ -540,6 +541,10 @@ function initCard(provider) {
     keyHeader.addEventListener("click", (e) => {
       if (e.target.closest(".btn-add-key")) return;
       keyManage.classList.toggle("collapsed");
+      if (state[provider]) {
+        state[provider].collapsed = keyManage.classList.contains("collapsed");
+        autoSave();
+      }
     });
   }
 
