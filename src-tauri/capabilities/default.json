@@ -20,9 +20,6 @@
     "core:window:allow-primary-monitor",
     "core:event:default",
     "core:app:default",
-    "shell:allow-open",
-    "autostart:allow-enable",
-    "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "shell:allow-open"
   ]
 }
