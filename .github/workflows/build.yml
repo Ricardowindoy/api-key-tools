@@ -299,46 +299,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ===== iOS 构建 =====
-  ios:
-    runs-on: macos-latest
-    permissions:
-      contents: write
+  # ===== iOS 构建（暂禁用，macOS Runner Image Xcode 路径问题待修复） =====
+  # ios:
+  #   runs-on: macos-latest
+  #   permissions:
+  #     contents: write
 
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v5
+  #   steps:
+  #     - name: 检出代码
+  #       uses: actions/checkout@v5
 
-      - name: 安装 Rust 工具链
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+  #     - name: 安装 Rust 工具链
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
 
-      - name: 缓存 Rust 编译产物
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
+  #     - name: 缓存 Rust 编译产物
+  #       uses: swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: src-tauri
 
-      - name: 安装 Tauri CLI
-        run: cargo install tauri-cli --version "^2.0" --locked
+  #     - name: 安装 Tauri CLI
+  #       run: cargo install tauri-cli --version "^2.0" --locked
 
-      - name: 初始化 iOS 工程
-        run: cargo tauri ios init
+  #     - name: 初始化 iOS 工程
+  #       run: cargo tauri ios init
 
-      # 第一步：直接用 cargo 编译 iOS Rust 代码，确保移动端可编译（不依赖 Xcode 签名）
-      - name: 编译 Rust（aarch64-apple-ios）
-        run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
+  #     - name: 配置 Xcode 环境
+  #       run: |
+  #         XCODE_APP=$(ls /Applications/Xcode*.app 2>/dev/null | head -1)
+  #         echo "找到 Xcode: ${XCODE_APP}"
+  #         if [ -n "$XCODE_APP" ]; then
+  #           sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+  #         fi
+  #         xcode-select -p
+  #         xcrun --sdk iphoneos --show-sdk-path 2>/dev/null || echo "⚠ iOS SDK 不可用"
+  #         xcodebuild -version 2>/dev/null || echo "⚠ xcodebuild 不可用"
 
-      # 第二步：尝试完整 Xcode 构建（无签名），失败不阻断流程
-      - name: 构建 iOS（未签名）
-        run: cargo tauri ios build --no-sign
-        continue-on-error: true
+  #     - name: 编译 Rust（aarch64-apple-ios）
+  #       run: cargo build --target aarch64-apple-ios --manifest-path src-tauri/Cargo.toml
 
-      - name: 上传 iOS 产物
-        uses: actions/upload-artifact@v5
-        with:
-          name: api-key-manager-ios
-          path: |
-            src-tauri/gen/apple/build/**/*.app
-            src-tauri/gen/apple/build/**/*.ipa
-          if-no-files-found: warn
+  #     - name: 构建 iOS（未签名）
+  #       run: cargo tauri ios build --no-sign
+  #       continue-on-error: true
+
+  #     - name: 上传 iOS 产物
+  #       uses: actions/upload-artifact@v5
+  #       with:
+  #         name: api-key-manager-ios
+  #         path: |
+  #           src-tauri/gen/apple/build/**/*.app
+  #           src-tauri/gen/apple/build/**/*.ipa
+  #         if-no-files-found: warn

@@ -16,8 +16,7 @@ use rand::RngCore;
 use rsa::{
     oaep::Oaep,
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
-    pss::{Pss, Signature as PssSignature},
-    signature::{RandomizedSigner, SignatureEncoding, Verifier},
+    pss::Pss,
     RsaPrivateKey, RsaPublicKey,
 };
 use serde::{Deserialize, Serialize};
@@ -223,10 +222,10 @@ pub fn sign_data(private_pem: &str, data: &[u8]) -> Result<String, String> {
     let priv_key = RsaPrivateKey::from_pkcs1_pem(private_pem)
         .map_err(|e| format!("私钥无效: {}", e))?;
     let pss = Pss::new::<Sha256>();
-    let signature: PssSignature = priv_key
+    let signature = priv_key
         .sign_with_rng(&mut rand::thread_rng(), pss, data)
         .map_err(|e| format!("签名失败: {}", e))?;
-    Ok(B64.encode(signature.to_bytes()))
+    Ok(B64.encode(signature))
 }
 
 /// 用公钥验证 RSA-PSS-SHA256 签名
@@ -236,10 +235,8 @@ pub fn verify_signature(public_pem: &str, data: &[u8], signature_b64: &str) -> R
     let sig_bytes = B64
         .decode(signature_b64)
         .map_err(|e| format!("签名 base64 解码失败: {}", e))?;
-    let signature = PssSignature::try_from(sig_bytes.as_slice())
-        .map_err(|e| format!("签名格式无效: {}", e))?;
     let pss = Pss::new::<Sha256>();
-    match pub_key.verify(pss, data, &signature) {
+    match pub_key.verify(pss, data, &sig_bytes) {
         Ok(()) => Ok(true),
         Err(_) => Ok(false),
     }
@@ -269,14 +266,14 @@ mod tests {
         m.insert(
             "test-provider".into(),
             crate::config::ProviderConfig {
-                base_url: Some("https://api.example.com".into()),
+                base_url: "https://api.example.com".into(),
                 keys: vec![crate::config::ApiKey {
                     id: "k1".into(),
-                    name: Some("主号".into()),
+                    name: "主号".into(),
                     key: "sk-test-12345".into(),
                     selected: true,
                 }],
-                selected_model: Some("gpt-4".into()),
+                selected_model: "gpt-4".into(),
             },
         );
         m
@@ -302,7 +299,7 @@ mod tests {
         assert_eq!(decrypted.len(), 1);
         assert_eq!(
             decrypted.get("test-provider").unwrap().base_url,
-            Some("https://api.example.com".into())
+            "https://api.example.com"
         );
         assert_eq!(
             decrypted.get("test-provider").unwrap().keys[0].key,
